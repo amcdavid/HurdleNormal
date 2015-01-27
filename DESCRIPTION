@@ -1,0 +1,19 @@
+Package: HurdleNormal
+Title: 'Estimation and sampling for multi-dimensional Hurdle models on a Normal density'
+Version: 0.0.0.9000
+Authors@R: person("Andrew", "McDavid", , "andrew.n.mcdavid@gmail.com", role = c("aut", "cre"))
+Description: A Hurdle model is a modification of a distribution at zero.  This package provides routines to estimate and sample from Hurdle models on a Normal density.
+Depends: R (>= 3.1.2)
+License: GPL-3
+LazyData: true
+Imports:
+    glmnet,
+    stringr,
+    Rcpp (>= 0.11.3),
+    numDeriv,
+    nloptr,
+    ggplot2
+Suggests:
+    testthat
+LinkingTo: Rcpp
+
