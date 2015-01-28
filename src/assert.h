@@ -22,7 +22,14 @@
  }
 #endif
 
-/* #define DPRINT */
-/* #ifdef DEBUG */
-/* Rprintf */
-/* #endif */
+#ifdef DEBUG
+#define DEXEC(x) x
+#else
+#define DEXEC(x)
+#endif
+
+#ifdef DEBUG
+#  define DPRINT(x) Rcerr << x;
+#else
+#  define DPRINT(x)
+#endif

@@ -2,9 +2,7 @@ context('Simulate from trivial distr')
 G <- diag(c(-14, -11, -15))
 H <- diag(c(5, 5, 8))
 K <- diag(c(1, 1, 2))
-## G <- diag(c(-13, -22))
-## H <- diag(c(5, 10))
-## K <- diag(c(1, 2))
+
 
 #no thinning necessary because the gibbs sampler always moves??
 library(Biobase)
