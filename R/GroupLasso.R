@@ -20,8 +20,11 @@
 ##' @return matrix of parameters, one row per lambda
 ##' @useDynLib HurdleNormal
 ##' @importFrom Rcpp sourceCpp
-cgpaths <- function(theta, y.zif, this.model, lambda=seq(1, 0, by=.1), control=list(tol=1e-6, maxrounds=100, maxit=1000, debug=1)){
+cgpaths <- function(theta, y.zif, this.model, lambda=exp(seq(1, -5, length.out=10)), control=list(tol=1e-6, maxrounds=300, maxit=500, debug=1)){
     out <- matrix(NA, nrow=length(lambda), ncol=length(theta))
+    p <- (length(theta)+1)/4
+    colnames(out) <- parmap(p)
+    rownames(out) <- lambda
     jerr <- rep(0, length(lambda))
     for(l in seq_along(lambda)){
         sp <-solvePen(theta, lambda[l], y.zif, this.model, control)
@@ -79,5 +82,5 @@ solvePen <- function(theta, lambda, y.zif, this.model, control){
             if(control$debug>1 || (round %% 10)==0) print(noquote(paste0('penll=', round(gll(theta), 4), ' theta= ', paste(round(theta, 2), collapse=','))))
         }
     } # end main loop
-    structure(theta, flag=c(converged=converged, round=round))
+    structure(ifelse(abs(theta)<control$tol, 0, theta), flag=c(converged=converged, round=round))
 }
