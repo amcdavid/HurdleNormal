@@ -16,7 +16,7 @@ double cpp_rCondHurdle(NumericVector x, int j, NumericMatrix G,  NumericMatrix H
   for(int i=0;i<x.length(); i++){ //index into x
     //which entry in the parameters is x?
     ii = (j+i+1) % p; 
-    //ASSERT_TRUE(ii>=0)
+    ASSERT_TRUE(ii>=0)
     DEXEC(char c[100]; snprintf(c, 100, "K(%d,%d)=%f, x(%d)=%f \n", j, ii, K(ii,j), i, x[i]));
     DPRINT(c);
     Gba = Gba + (2*G(j,ii)*xI[i]+ x[i]*H(j,ii));
@@ -29,10 +29,10 @@ double cpp_rCondHurdle(NumericVector x, int j, NumericMatrix G,  NumericMatrix H
   double logitP = Gba - .5*log(Kba/(2*PI))+pow(Hba,2)/(2*Kba);
   //std::cout << ". logitP=" << logitP << "\n";
   double mu = Hba/Kba;
-  //Rprintf("x=(%f,%f), j=%d, mu=%f\n", x[0], x[1], j, mu);
+  DEXEC(Rprintf("x=(%f,%f), j=%d, mu=%f\n", x[0], x[1], j, mu));
   double y = 0;
   double yI = Rf_runif(0.0, 1.0);//runif(1)[0];
-  //std::cout << ". expit(logitP)=" << expit(logitP)  << "\n";
+  DEXEC(Rcout << ". expit(logitP)=" << expit(logitP)  << "\n");
   if(yI<expit(logitP)) y = Rf_rnorm(mu, pow(Kba, -.5));//rnorm(1, mu, pow(Kba, -.5))[0];
   return y;	
 }

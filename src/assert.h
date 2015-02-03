@@ -29,7 +29,7 @@
 #endif
 
 #ifdef DEBUG
-#  define DPRINT(x) Rcerr << x;
+#  define DPRINT(x) Rcerr << x
 #else
 #  define DPRINT(x)
 #endif
