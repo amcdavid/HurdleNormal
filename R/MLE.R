@@ -19,6 +19,7 @@ generatelogLik <- function(y, x, lambda=0, debug=FALSE, returnGrad=FALSE, xNames
     yI <- abs(y)>TOL
     gidx <- seq(2, p)
     par <- parmap(p)
+    if(is.matrix(y)) dim(y) <- NULL
     
     ## gradient of pieces of log-likelihood
     ## constant in theta
