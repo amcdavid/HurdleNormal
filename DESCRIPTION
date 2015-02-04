@@ -12,7 +12,8 @@ Imports:
     Rcpp (>= 0.11.3),
     numDeriv,
     nloptr,
-    ggplot2
+    ggplot2,
+    reshape
 Suggests:
     testthat
 LinkingTo: Rcpp

@@ -75,6 +75,7 @@ test_that('Marginals for Gdep', {
     expect_more_than(gibbs1d$p.value, .05)
 })
 
+## test condition distributions for non-zero terms, including offset
 adjustedCondDistr <- function(hs){
     offt1 <- with(hs$true, -.5*log(K[1,1]/(2*pi)) + (H[1,1]-K[1,2]*hs$gibbs[,2]+H[2,1]*(hs$gibbs[,2]>0))^2/(2*K[1,1]))
     offt2 <- with(hs$true, -.5*log(K[2,2]/(2*pi)) + (H[2,2]-K[2,1]*hs$gibbs[,1]+H[1,2]*(hs$gibbs[,1]>0))^2/(2*K[2,2]))
@@ -90,7 +91,15 @@ adjustedCondDistr <- function(hs){
 
 test_that('Conditionals for Hlowdep', {
     Hlowdep <- getGibbs(Hlowdep)
-    adjustedCondDistr(Hlowdep)
+    testslow <- adjustedCondDistr(Hlowdep)
+    ## 1 given 2 should have no binary dependence
+    ## but yes LS dependence
+    ## g12 both coef null
+    expect_true(all(abs(testslow[1,3:4])<2))
+    ## g21 continuous sig
+    expect_more_than(testslow[2,3],2)
+    ## binary not
+    expect_less_than(abs(testslow[2,4]),2)
     Hupdep <- getGibbs(Hupdep)
-    adjustedCondDistr(Hupdep)    
+    testshi <- adjustedCondDistr(Hupdep)    
 })

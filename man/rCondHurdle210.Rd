@@ -4,12 +4,12 @@
 \alias{rCondHurdle210}
 \title{Sample from the full conditional distribution}
 \usage{
-rCondHurdle210(x, i, G, H, K, tol = 5e-04)
+rCondHurdle210(x, j, G, H, K, tol = 5e-04)
 }
 \arguments{
 \item{x}{vector, or matrix, to be conditioned upon.}
 
-\item{i}{coordinate to be returned}
+\item{j}{coordinate to be returned}
 
 \item{G}{binary dependence matrix}
 

@@ -25,14 +25,14 @@ generatelogLik <- function(y, x, lambda=0, debug=FALSE, returnGrad=FALSE, xNames
     ## constant in theta
     dg <- list(gbb=1,
                gba=2*xI,
-               hba=0,
+               hab=0,
                hbb=0,
-               hab=x,
+               hba=x,
                kba=0,
                kbb=0)
-    dh <- list(hba=xI,
+    dh <- list(hab=xI,
                hbb=1,
-               hab=0,
+               hba=0,
                kba=-x,
                gbb=0,
                gba=0,
@@ -61,8 +61,8 @@ generatelogLik <- function(y, x, lambda=0, debug=FALSE, returnGrad=FALSE, xNames
         k0 <- theta[par=='kbb']
         stopifnot(names(g0)=='gbb' & names(h0)=='hbb' & names(k0)=='kbb')
 
-        gpart <- g0+2*xI%*%gBA+x%*%hAB
-        hpart <- h0+xI%*%hBA-x%*%kBA
+        gpart <- g0+2*xI%*%gBA+x%*%hBA
+        hpart <- h0+xI%*%hAB-x%*%kBA
         cpart <- -.5*log(k0/(2*pi)) + hpart^2/(2*k0)
 
         lgroup <- rep(0, p)
@@ -73,7 +73,7 @@ generatelogLik <- function(y, x, lambda=0, debug=FALSE, returnGrad=FALSE, xNames
         
 
         ## prevent scaling problems
-        cumulant <-ifelse(gpart + cpart>LARGE, gpart+cpart, log(1+ exp(gpart+cpart)))
+        cumulant <-ifelse((gpart + cpart)>LARGE, gpart+cpart, log(1+ exp(gpart+cpart)))
         assign('gBA', gBA, pos=frame)
         assign('hAB', hAB, pos=frame)
         assign('hBA', hBA, pos=frame)
@@ -107,11 +107,11 @@ generatelogLik <- function(y, x, lambda=0, debug=FALSE, returnGrad=FALSE, xNames
         ## sub parts to gradient
         hpart.expand <- do.call(cbind, rep(list(hpart), p-1))
         dC <- list(hbb=hpart/k0,
-                   hba=xI*hpart.expand/k0,
+                   hab=xI*hpart.expand/k0,
                    kba=-x*hpart.expand/k0,
                    gbb=0,
                    gba=0,
-                   hab=0,
+                   hba=0,
                    kbb=-.5*(hpart^2+k0)/k0^2)
         ecumulant <- exp(gpart+cpart)
         rcumulant <- ifelse(gpart+cpart>LARGE, 1, ecumulant/(1+ecumulant))
@@ -266,43 +266,44 @@ generatelogLik <- function(y, x, lambda=0, debug=FALSE, returnGrad=FALSE, xNames
 ## }
 
 LAYERMAP <- c('gbb'='G', 'gba'='G',
-              'hbb'='Hdisc', 'hab'='Hdisc', 'hba'='Hcont',
+              'hbb'='Hdisc', 'hba'='Hdisc', 'hab'='Hcont',
               'kba'='K', 'kbb'='K')
 OLAYER <- c(G=1, Hdisc=2, Hcont=3, K=4)
 
-getJoint210 <- function(zmFits){
-    s2 <- attr(zmFits, 'sigma2')
-    genes <- which(!is.na(s2[,'dichotomous'])) #genes with errors will be NA                                    
-    ng <- length(genes)
-    ## Off-diagonal entries are all estimated twice:
-    ## Once for A|B and once for B|A
-    ## H matrix has more complicated relationship:
-    ## Upper tri of A|B is lower tri of B|A
-    ## So we'll keep the redundant estimates in two separate slices
-    ## (Hdisc=upper tri of B|A, Hcont=lower tri of B|A)
-    ## Then average them
-    theta <- array(NA, dim=c(ng, ng, 4), #G, Hdisc, Hcont, K
-                   dimnames=list(names(genes), names(genes), c('G', 'Hdisc', 'Hcont', 'K')))
-    layer <-  OLAYER[LAYERMAP[parmap(ng)]]
-    for(goodidx in seq_len(ng)){
-        g <- genes[goodidx]             #original index
-        par <- zmFits[[g,1]]
-        this.genes <- attr(par, 'genes')
-        good.genes.idx <- which(this.genes %in% names(genes))
-        good.genes <- this.genes[good.genes.idx]
-        browser(expr=length(intersect(names(genes), good.genes))!=ng)
-        ##stopifnot(length(intersect(names(genes), good.genes))==ng)
-        idx <- cbind(goodidx, match(good.genes, names(genes)), layer )
-        theta[idx] <- par$coef[good.genes.idx]
-    }
-    G <- (theta[,,'G']+t(theta[,,'G']))/2
-    Hdisc <- theta[,,'Hdisc']
-    Hcont <- theta[,,'Hcont']
-    diag(Hcont) <- diag(Hdisc)
-    H <- (Hdisc+Hcont)/2
-    K <- (theta[,,'K']+t(theta[,,'K']))/2
-    list(G=G, H=H, K=K)
-}
+## getJoint210 <- function(zmFits){
+##     s2 <- attr(zmFits, 'sigma2')
+##     genes <- which(!is.na(s2[,'dichotomous'])) #genes with errors will be NA                                    
+##     ng <- length(genes)
+##     ## Off-diagonal entries are all estimated twice:
+##     ## Once for A|B and once for B|A
+##     ## H matrix has more complicated relationship:
+##     ## Upper tri of A|B is lower tri of B|A
+##     ## So we'll keep the redundant estimates in two separate slices
+##     ## (Hdisc=upper tri of B|A, Hcont=lower tri of B|A)
+##     ## Then average them
+##     theta <- array(NA, dim=c(ng, ng, 4), #G, Hdisc, Hcont, K
+##                    dimnames=list(names(genes), names(genes), c('G', 'Hdisc', 'Hcont', 'K')))
+##     layer <-  OLAYER[LAYERMAP[parmap(ng)]]
+##     for(goodidx in seq_len(ng)){
+##         g <- genes[goodidx]             #original index
+##         par <- zmFits[[g,1]]
+##         this.genes <- attr(par, 'genes')
+##         good.genes.idx <- which(this.genes %in% names(genes))
+##         good.genes <- this.genes[good.genes.idx]
+##         browser(expr=length(intersect(names(genes), good.genes))!=ng)
+##         ##stopifnot(length(intersect(names(genes), good.genes))==ng)
+##         idx <- cbind(goodidx, match(good.genes, names(genes)), layer )
+##         theta[idx] <- par$coef[good.genes.idx]
+##     }
+##     G <- (theta[,,'G']+t(theta[,,'G']))/2
+##     Hdisc <- theta[,,'Hdisc']
+##     Hcont <- theta[,,'Hcont']
+##     diag(Hcont) <- diag(Hdisc)
+##     H <- (Hdisc+Hcont)/2
+##     K <- (theta[,,'K']+t(theta[,,'K']))/2
+##     list(G=G, H=H, K=K)
+## }
+
 
 fix <- function(fun, fixedCoords, fixed){
     function(y){

@@ -10,17 +10,17 @@ logit <- function(x) log(x/(1-x))
     stopifnot(all.equal(t(K), K))
     eK <- eigen(K, only.values=TRUE)$values
     stopifnot(all(eK>0) &&  all(Im(eK)==0))
-    if(!missing(x)) stopifnot(ncol(x)==ncol(H))
+    if(!missing(x)) stopifnot(length(x) == ncol(H) || nrow(x)==ncol(H))
 }
 
 ## joint density function
-## x is row vector!!!
-## But should be a column vector...
+## if x is a matrix, it should be cbind'd column vectors
 dHurdle210 <- function(x, G, H, K, tol=5e-2){
-    if(length(dim(x))<2) x <- t(as.matrix(x))
+    if(length(dim(x))<2) x <- as.matrix(x)
     .checkArgs(x, G, H, K)
     xI <- (abs(x)>tol)*1
-    logDens <- xI %*% G %*% t(xI) + (xI*x)%*%H%*%t(xI) - .5*(xI*x)%*%K%*%t(xI*x)
+    x[xI==0] <- 0
+    logDens <- t(xI) %*% G %*% xI + t(xI)%*%H%*%x - .5*t(x)%*%K%*%(x)
     exp(logDens)
 }
 
@@ -162,31 +162,12 @@ rv <- function(x){
 rGibbsHurdle <- function(G, H, K, Nt, burnin=floor(Nt/2), thin=1, tol=5e-4){
     p <- ncol(G)
     .checkArgs(matrix(ncol=p), G, H, K)
-    ## samp is internally arrayed backwards from what rCondHurdle uses,
-    ## but it is much easier to have it in column-major order for the purposes of gibbs sampling
+    ## coords X samples
     tmat <- .rGibbsHurdle(G, H, K, Nt, tol)
     mat <- t(tmat)[-seq_len(burnin),]
     keep <- seq(from=1, to=nrow(mat), by=round(1/thin))
     mat[keep,]
 }
-
-loopMLE <- function(samp){
-    p <- ncol(samp)
-    separm <- parm <- matrix(0, nrow=p, ncol=length(parmap(p)))
-    colnames(separm) <- colnames(parm) <- parmap(p)
-    parm[,'kbb'] <- 1
-    for(j in 1:p){
-        y <- samp[,j]
-        x <- samp[,-j]
-        ll <- generatelogLik(y, x)
-        grad <- generatelogLik(y, x, returnGrad=TRUE)
-        O <- optim(parm[j,], ll, grad, method='BFGS', hessian=TRUE)
-        parm[j,] <- O$par
-        separm[j,] <- try(sqrt(diag(solve(O$hessian))))
-    }
-    list(parm, separm)
-}
-
 
 addPseudoCounts <- function(rgh){
     ## (1) At least 3 totally positive counts (so mean and covariance are estimible)

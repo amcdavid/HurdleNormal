@@ -28,6 +28,55 @@ getDensity <- function(hs, ...){
     function(x) with(hs$true, dHurdle210(x, G, H, K, ...))
 }
 
+##' Loop over indices and solve condiiton MLE
+##'
+##' @param hs HurdleStructure
+##' @param using 'gibbs' or 'sample'
+##' @param ... passed to optim
+##' @return list of length two giving parameter values and standard errors. j is the index of the response, i is the index of the coefficient.
+##' @export
+getConditionalMLE <- function(hs,using='gibbs', testGrad=FALSE, ...){
+    samp <-  if(using=='gibbs') hs$gibbs else hs$sample
+    p <- ncol(samp)
+    coefIndex <- separm <- parm <- matrix(0, nrow=p, ncol=length(parmap(p)), dimnames=list(1:p, parmap(p)))
+    parm[,'kbb'] <- 1
+    for(j in 1:p){
+        y <- samp[,j]
+        x <- samp[,-j]
+        ll <- generatelogLik(y, x)
+        grad <- generatelogLik(y, x, returnGrad=TRUE)
+        O <- hushWarning(optim(parm[j,], ll, grad, method='BFGS', hessian=TRUE, ...), fixed('NaNs produced'))
+        if(testGrad && !all(abs(grad(O$par))<.1)){
+            stop('Gradient not zero at putative solution.  Max |grad| =  ', max(abs(grad(O$par))))
+        }
+        parm[j,] <- O$par
+        try(separm[j,] <- sqrt(diag(solve(O$hessian*nrow(samp)))), silent=TRUE) #gradient is scaled by 1/N
+        ## what index in data do these components refer to?
+        ## remap coordmap by current permutation of indices
+        coefIndex[j,] <- c(j, setdiff(1:p, j))[coordmap(p)]
+    }
+    Parm <- reshape::melt(parm)
+    Separm <- reshape::melt(separm)
+    names(Parm) <- names(Separm) <-  c('j', 'par', 'value')
+    Parm <- cbind(Parm, i=as.numeric(coefIndex))
+    Separm <- cbind(Separm, i=as.numeric(coefIndex))
+    list(Parm=Parm, Separm=Separm)
+}
+
+getJoint <- function(fit){
+    C <- lapply(cast(fit$Parm, i~j | par), as.matrix)
+    G <- C$gba
+    diag(G) <- diag(C$gbb)
+    H <- C$hba + t(C$hab)
+    diag(H) <- diag(C$hbb)
+    K <- C$kba
+    diag(K) <- diag(C$kbb)
+    G <- (G+t(G))/2
+    K <- (K+t(K))/2
+    list(G=G, H=H, K=K)
+}
+
+
 simulateHurdle210 <- function(N, p, dependence='G', structure='independence', structureArgs=list(sparsity=.1, groupwise=FALSE), intensityArgs=list(G=1, Hupper=1, Hlower=1, K=-.3), Hdiag=5, Kdiag=1, G0odds=0){
     dependence <- match.arg(dependence, c('G', 'Hupper', 'Hlower', 'K'), several.ok=TRUE)
     structure <- match.arg(structure, c('independence', 'sparse', 'chain'))
