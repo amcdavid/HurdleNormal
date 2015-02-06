@@ -1,6 +1,6 @@
 ## names of parameters in vector
 parmap <- function(p){
-     rep(c('gbb', 'gba', 'hbb', 'hab', 'hba', 'kba', 'kbb'), times=c(1, p-1, 1, p-1, p-1, p-1, 1))
+     rep(c('gbb', 'gba', 'hbb', 'hba', 'hab', 'kba', 'kbb'), times=c(1, p-1, 1, p-1, p-1, p-1, 1))
 }
 
 ## block groups
