@@ -1,6 +1,7 @@
 #include <Rcpp.h>
-//#define DEBUG 0
 #include "assert.h"
+#include "hurdle.h"
+//#define DEBUG 0
 using namespace Rcpp;
 
 double expit(double x){
@@ -16,7 +17,6 @@ double cpp_rCondHurdle(NumericVector x, int j, NumericMatrix G,  NumericMatrix H
   for(int i=0;i<x.length(); i++){ //index into x
     //which entry in the parameters is x?
     ii = (j+i+1) % p; 
-    ASSERT_TRUE(ii>=0)
     DEXEC(char c[100]; snprintf(c, 100, "K(%d,%d)=%f, x(%d)=%f \n", j, ii, K(ii,j), i, x[i]));
     DPRINT(c);
     Gba = Gba + (2*G(j,ii)*xI[i]+ x[i]*H(j,ii));

@@ -34,29 +34,41 @@ getDensity <- function(hs, ...){
 ##' @param using 'gibbs' or 'sample'
 ##' @param ... passed to optim
 ##' @return list of length two giving parameter values and standard errors. j is the index of the response, i is the index of the coefficient.
+##' @import reshape
 ##' @export
-getConditionalMLE <- function(hs,using='gibbs', testGrad=FALSE, ...){
+getConditionalMLE <- function(hs,using='gibbs', testGrad=FALSE, engine='R', ...){
     samp <-  if(using=='gibbs') hs$gibbs else hs$sample
     p <- ncol(samp)
     coefIndex <- separm <- parm <- matrix(0, nrow=p, ncol=length(parmap(p)), dimnames=list(1:p, parmap(p)))
     parm[,'kbb'] <- 1
     for(j in 1:p){
         y <- samp[,j]
-        x <- samp[,-j]
-        ll <- generatelogLik(y, x)
-        grad <- generatelogLik(y, x, returnGrad=TRUE)
-        O <- hushWarning(optim(parm[j,], ll, grad, method='BFGS', hessian=TRUE, ...), fixed('NaNs produced'))
+        x <- samp[,-j,drop=FALSE]
+        if(engine=='R'){
+            ll <- generatelogLik(y, x, lambda=0)
+            grad <- generatelogLik(y, x, lambda=0, returnGrad=TRUE)
+        } else{
+            hl <- HurdleLikelihood(y, x, theta=parm[j,], lambda=0)
+            ll <- hl$LLall
+            grad <- hl$gradAll
+        }
+        O <- hushWarning(optim(parm[j,], ll, method='BFGS', hessian=TRUE, ...), fixed('NaNs produced'))
         if(testGrad && !all(abs(grad(O$par))<.1)){
             stop('Gradient not zero at putative solution.  Max |grad| =  ', max(abs(grad(O$par))))
         }
-        parm[j,] <- O$par
+
+        ## O2 <- optim(parm[j,], ll, gr=grad, method='BFGS', hessian=TRUE)
+        ## hl$LLall(O1$par)
+        ## hl$grad(O2$par[c(1, 4, 11)], grp=-1)
+        ## hl$gradAll(O1$par)
+        ## parm[j,] <- O$par
         try(separm[j,] <- sqrt(diag(solve(O$hessian*nrow(samp)))), silent=TRUE) #gradient is scaled by 1/N
         ## what index in data do these components refer to?
         ## remap coordmap by current permutation of indices
         coefIndex[j,] <- c(j, setdiff(1:p, j))[coordmap(p)]
     }
-    Parm <- reshape::melt(parm)
-    Separm <- reshape::melt(separm)
+    Parm <- melt(parm)
+    Separm <- melt(separm)
     names(Parm) <- names(Separm) <-  c('j', 'par', 'value')
     Parm <- cbind(Parm, i=as.numeric(coefIndex))
     Separm <- cbind(Separm, i=as.numeric(coefIndex))
@@ -64,7 +76,7 @@ getConditionalMLE <- function(hs,using='gibbs', testGrad=FALSE, ...){
 }
 
 getJoint <- function(fit){
-    C <- lapply(cast(fit$Parm, i~j | par), as.matrix)
+    C <- lapply(cast(fit$Parm, i~j | par), function(x) as.matrix(x[,-1]))
     G <- C$gba
     diag(G) <- diag(C$gbb)
     H <- C$hba + t(C$hab)

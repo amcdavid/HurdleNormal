@@ -1,0 +1,56 @@
+Indep <- HurdleStructure(G=-13*diag(3), H=diag(3)*5, K=diag(3))
+Gdep <- Indep
+Gdep$true$G[1,2] <- Gdep$true$G[2,1] <- 1.5
+Kdep1 <- Indep
+Kdep1$true$K[1,2] <- Kdep1$true$K[2,1] <- -.7
+Kdep2 <- Kdep1
+Kdep2$true$H[1,2] <- Kdep2$true$H[2,1] <- -2.25
+Hupdep <- Indep
+Hupdep$true$H[1,2] <- 1.5
+Hupdep$true$G[2,2] <- Hupdep$true$G[1,1] <- -18.5
+Hlodep <- Indep
+Hlodep$true$H[2,1] <- 1.5
+Hlodep$true$G[2,2] <- Hlodep$true$G[1,1] <- -18.5
+
+Indep <- getGibbs(Indep)
+Gdep <- getGibbs(Gdep)
+Kdep2 <- getGibbs(Kdep2)
+Hupdep <- getGibbs(Hupdep)
+Hlodep <- getGibbs(Hlodep)
+
+
+library(plyr)
+library(nloptr)
+getLimit <- function(hs, engine='R'){
+    thin=.1
+    burnin=1000
+    fitseries <- laply(c(50, 250, 1250), function(sub) {
+        n <- sub/thin+burnin
+        hs <- suppressMessages(getGibbs(hs, Nt=n, burnin=burnin, thin=thin))
+        fit <- getConditionalMLE(hs, testGrad=TRUE, engine=engine) 
+        gj <- getJoint(fit)
+        err <- sapply(c('G', 'H', 'K'), function(i) sum((hs$true[[i]]-gj[[i]])^2))
+        err
+    })
+    fitseries
+}
+
+library(numDeriv)
+checkGrad <- function(hs, j=1, theta, lambda=0, engine='R'){
+    sample <- hs$gibbs
+    par <- parmap(ncol(sample))
+    if(missing(theta))     theta <- setNames(rep(2, length(par)), par)
+    if(engine=='R'){
+        gl <- generatelogLik(sample[,j], sample[,-j, drop=FALSE], lambda=lambda)
+        gr <- generatelogLik(sample[,j], sample[,-j, drop=FALSE], lambda=lambda, returnGrad=TRUE)
+} else if(engine=='cpp'){
+    hl <- HurdleLikelihood(sample[,j], sample[,-j, drop=FALSE], theta=theta, lambda=lambda)
+    gl <- hl$LLall
+    gr <- hl$gradAll
+} else{
+    stop('unreachable')
+}
+    g1 <- grad(gl, theta)
+    g2 <- gr(theta)
+    expect_equal(g1, g2,tolerance=1e-4, check.names=FALSE)
+}
