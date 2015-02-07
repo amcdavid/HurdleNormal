@@ -44,15 +44,16 @@ getConditionalMLE <- function(hs,using='gibbs', testGrad=FALSE, engine='R', ...)
     for(j in 1:p){
         y <- samp[,j]
         x <- samp[,-j,drop=FALSE]
+        hl <- HurdleLikelihood(y, x, theta=parm[j,], lambda=0)
         if(engine=='R'){
             ll <- generatelogLik(y, x, lambda=0)
             grad <- generatelogLik(y, x, lambda=0, returnGrad=TRUE)
         } else{
-            hl <- HurdleLikelihood(y, x, theta=parm[j,], lambda=0)
             ll <- hl$LLall
             grad <- hl$gradAll
         }
-        O <- hushWarning(optim(parm[j,], ll, method='BFGS', hessian=TRUE, ...), fixed('NaNs produced'))
+        O <- try(hushWarning(optim(parm[j,], ll, method='BFGS', hessian=TRUE, ...), fixed('NaNs produced')))
+        if(inherits(O, 'try-error'))browser()
         if(testGrad && !all(abs(grad(O$par))<.1)){
             stop('Gradient not zero at putative solution.  Max |grad| =  ', max(abs(grad(O$par))))
         }
@@ -61,7 +62,7 @@ getConditionalMLE <- function(hs,using='gibbs', testGrad=FALSE, engine='R', ...)
         ## hl$LLall(O1$par)
         ## hl$grad(O2$par[c(1, 4, 11)], grp=-1)
         ## hl$gradAll(O1$par)
-        ## parm[j,] <- O$par
+        parm[j,] <- O$par
         try(separm[j,] <- sqrt(diag(solve(O$hessian*nrow(samp)))), silent=TRUE) #gradient is scaled by 1/N
         ## what index in data do these components refer to?
         ## remap coordmap by current permutation of indices

@@ -24,14 +24,18 @@ library(nloptr)
 getLimit <- function(hs, engine='R'){
     thin=.1
     burnin=1000
-    fitseries <- laply(c(50, 250, 1250), function(sub) {
+    series <- c(50, 250, 1250)
+    fitseries <- matrix(NA, nrow=length(series), ncol=3)
+    colnames(fitseries) <- c("G", "H", "K")
+    for(i in seq_along(series)){
+        sub <- series[i]
         n <- sub/thin+burnin
         hs <- suppressMessages(getGibbs(hs, Nt=n, burnin=burnin, thin=thin))
         fit <- getConditionalMLE(hs, testGrad=TRUE, engine=engine) 
         gj <- getJoint(fit)
         err <- sapply(c('G', 'H', 'K'), function(i) sum((hs$true[[i]]-gj[[i]])^2))
-        err
-    })
+        fitseries[i,] <- err
+    }
     fitseries
 }
 
@@ -40,17 +44,22 @@ checkGrad <- function(hs, j=1, theta, lambda=0, engine='R'){
     sample <- hs$gibbs
     par <- parmap(ncol(sample))
     if(missing(theta))     theta <- setNames(rep(2, length(par)), par)
+    glR <- generatelogLik(sample[,j], sample[,-j, drop=FALSE], lambda=lambda)
+    grR <- generatelogLik(sample[,j], sample[,-j, drop=FALSE], lambda=lambda, returnGrad=TRUE)
     if(engine=='R'){
-        gl <- generatelogLik(sample[,j], sample[,-j, drop=FALSE], lambda=lambda)
-        gr <- generatelogLik(sample[,j], sample[,-j, drop=FALSE], lambda=lambda, returnGrad=TRUE)
+        ## numeric
+        gnum <- grad(glR, theta)
+        ganalytic <- grR(theta)
 } else if(engine=='cpp'){
     hl <- HurdleLikelihood(sample[,j], sample[,-j, drop=FALSE], theta=theta, lambda=lambda)
-    gl <- hl$LLall
-    gr <- hl$gradAll
+    gnum <- grad(hl$LLall, theta)
+    ganalytic <- hl$gradAll(theta)
+    ##browser()
+    expect_equal(hl$LLall(theta), glR(theta), tolerance=1e-6, check.names=FALSE)
+    expect_equal(hl$gradAll(theta), grR(theta), tolerance=1e-6, check.names=FALSE)
 } else{
     stop('unreachable')
 }
-    g1 <- grad(gl, theta)
-    g2 <- gr(theta)
-    expect_equal(g1, g2,tolerance=1e-4, check.names=FALSE)
+    
+    expect_equal(gnum, ganalytic,tolerance=1e-4, check.names=FALSE)
 }

@@ -3,58 +3,44 @@
 using namespace arma;
 
 // [[Rcpp::depends(RcppArmadillo)]]
-HurdleLikelihood::HurdleLikelihood (arma::vec y_, arma::mat x_, arma::ivec grp_, arma::vec th_, arma::vec lambda_, double tol)
-  : y(y_), yI(y_.n_rows, fill::ones), 
-    x(x_), xI(x_.n_rows, x_.n_cols,fill::ones), 
-    grp(grp_),
-    gba(x_.n_cols), hba(x_.n_cols), hab(x_.n_cols), kba(x_.n_cols),
-    xI_gba(x_.n_rows, x_.n_cols), x_hba(x_.n_rows, x_.n_cols),
-    xI_hab(x_.n_rows, x_.n_cols), x_kba(x_.n_rows, x_.n_cols),
-    gpart(x_.n_rows, fill::zeros), hpart(x_.n_rows, fill::zeros), cpart(x_.n_rows, fill::zeros),
+HurdleLikelihood::HurdleLikelihood (const arma::vec& y_, const arma::mat& x_, const arma::ivec& grp_, const arma::vec& th, const arma::vec& lambda_, double tol)
+  : y(y_), yI(y_.n_rows, fill::ones),
+    x(x_), xI(x_.n_rows, x_.n_cols,fill::ones),
+    grp(grp_), g0(0), h0(0), k0(1),
+    gba(x_.n_cols, fill::zeros), hba(x_.n_cols, fill::zeros), hab(x_.n_cols, fill::zeros), kba(x_.n_cols, fill::zeros),
+    gpart(x_.n_rows, fill::zeros), hpart(x_.n_rows, fill::zeros),
     gplusc(x_.n_rows, fill::zeros), cumulant(x_.n_rows, fill::zeros), cumulant2(x_.n_rows, fill::zeros),
+    Sy2(sum(square(y_))), Sy(sum(y_)), SyI(999),
+    Sn(x_.n_rows),k(x_.n_cols),
   SxI(x_.n_cols), Sx(x_.n_cols), SyIxI(x_.n_cols), SyIx(x_.n_cols),
   SyxI(x_.n_cols), Syx(x_.n_cols),
-  pengrp(x_.n_cols, fill::zeros), lambda(lambda_)
+    pengrp(x_.n_cols, fill::zeros), lambda(lambda_)
 {
-  Sn = x.n_rows;
-  k = x.n_cols;
   // set up indicator matrices
   yI.elem(find(abs(y)<tol)).zeros();
   xI.elem(find(abs(x)<tol)).zeros();
   //for(uword i=0;i<x.n_elem;i++) if(std::abs(x(i))<tol) xI(i)=0; 
   // set up linear sufficient statistics
-  Sy2 = sum(square(y));
-  SxI = sum(xI, 0).t();
-  Sx = sum(x, 0).t();
-  Sy = sum(y);
-  SyI = sum(yI);
-  for(int i=0;i<k;i++){
-    SyIxI(i) = sum(yI%xI.col(i));
-    SyIx(i) = sum(yI%x.col(i));
-    SyxI(i) = sum(y%xI.col(i));
-    Syx(i) = sum(y%x.col(i));
-    }
+   SxI = sum(xI, 0).t();
+   Sx = sum(x, 0).t();
+   SyI = sum(yI);
+   SyIxI = xI.t() * yI;
+   SyIx = x.t() * yI;
+   SyxI = xI.t() * y;
+   Syx = x.t() *y;
   // populate params
   for(int i=-1; i<k; i++){
-    vec subth = th_.elem(find(grp==i));
-    populatePar(i, subth);
+    populatePar(i, th.elem(find(grp==i)));
   }
-  for(int j=0; j<Sn;j++){
-    xI_gba.row(j) = xI.row(j)%gba.t();
-    x_hba.row(j) = x.row(j)%hba.t();
-    xI_hab.row(j)= xI.row(j)%hab.t();
-    x_kba.row(j) = x.row(j)%kba.t();
-    gpart(j) = g0+sum(2*xI_gba.row(j) + x_hba.row(j));
-    hpart(j) = h0+sum(xI_hab.row(j) - x_kba.row(j));
-  }
-  DPRINT("x_kba=" << x_kba<<"\n");
-  DPRINT("gpart(0)=" << gpart(0)<<"\n");
+    gpart = g0+2*xI*gba + x*hba;
+    hpart = h0+xI*hab -x*kba;
+    DPRINT("Finished construction. dim(gpart)=" << gpart.n_rows << "gpart(0)=" << gpart(0)<<"\n");
 }
 
   // pack parameters group `grp` with th
 //do online updates of crossproducts, gpart and hpart 
-  bool HurdleLikelihood::populatePar(int grp, vec th){
-    DPRINT("grp=" << grp << " th=" << th << "\n");
+  bool HurdleLikelihood::populatePar(int grp, const vec& th){
+    //    DPRINT("grp=" << grp << " th=" << th << "\n");
     bool changed=true;
     //update param and cross products
     if(grp == -1){ //intercept
@@ -62,28 +48,24 @@ HurdleLikelihood::HurdleLikelihood (arma::vec y_, arma::mat x_, arma::ivec grp_,
       	std::abs(h0-th(1))>datum::eps || std::abs(k0-th(2))>datum::eps;
       if(changed){
 	//	DPRINT("gpart(0)=" << gpart(0));
-	gpart -= g0;
-	hpart -= h0;
+	gpart += (th(0)-g0);
+	hpart += (th(1)-h0);
 	g0 = th(0), h0=th(1), k0=th(2);
 	//	DPRINT("gpart(0)=" << gpart(0));
-	gpart += g0;
-	hpart += h0;
       }
     } else{ //covariates
       changed = std::abs(gba(grp)-th(0))> 0 || 
       std::abs(hba(grp)-th(1))>0 || 
       std::abs(hab(grp)-th(2))>0 ||
       std::abs(kba(grp)-th(3))>0;
-      ASSERT(x_kba.n_cols, x.n_cols)
 	if(changed){
-	  //	  DPRINT("gpart(0)=" << gpart(0));
-	  gpart -= (2*xI_gba.col(grp) + x_hba.col(grp));
-	  //	  DPRINT("gpart(0)=" << gpart(0));
-	  hpart -= (xI_hab.col(grp)-x_kba.col(grp));
+	  DPRINT("gpart(0)=" << gpart(0));
+	  gpart += (2*xI.col(grp)*(th(0)-gba(grp)) + 
+		    x.col(grp)*(th(1)-hba(grp)));
+	  hpart +=  (xI.col(grp)*(th(2)-hab(grp)) - 
+		     x.col(grp)*(th(3)-kba(grp)));
+	  // //	  DPRINT("gpart(0)=" << gpart(0));
 	  gba(grp)=th(0), hba(grp)=th(1), hab(grp)=th(2), kba(grp)=th(3);
-	  updateCrossproducts(grp);
-	  gpart += (2*xI_gba.col(grp) + x_hba.col(grp));
-	  hpart += (xI_hab.col(grp)-x_kba.col(grp));
 	  pengrp(grp) = sqrt(sum(square(th)));
 	  DPRINT("Updated\n");
 	} else{
@@ -102,35 +84,41 @@ HurdleLikelihood::HurdleLikelihood (arma::vec y_, arma::mat x_, arma::ivec grp_,
 
 
 
-void HurdleLikelihood::updateCrossproducts(int i){
-  xI_gba.col(i) = xI.col(i)*gba(i);
-  x_hba.col(i) = x.col(i)*hba(i);
-  xI_hab.col(i) = xI.col(i)*hab(i);
-  x_kba.col(i) = x.col(i)*kba(i);
-  ASSERT(x_kba.n_cols, x.n_cols)
-}
+// void HurdleLikelihood::updateCrossproducts(int i){
+//   xI_gba.col(i) = xI.col(i)*gba(i);
+//   x_hba.col(i) = x.col(i)*hba(i);
+//   xI_hab.col(i) = xI.col(i)*hab(i);
+//   x_kba.col(i) = x.col(i)*kba(i);
+//   ASSERT(x_kba.n_cols, x.n_cols)
+// }
+
 
 void HurdleLikelihood::updateGroupSums(bool updateSums, bool updateGrad){
-  uvec small = find(gplusc<LARGE);
   if(updateSums){
-    cpart = -.5*log(k0/(2*datum::pi))+pow(hpart, 2)/(2*k0);
-    // log(1 + e^x) = x unless x < LARGE 
-    gplusc = gpart + cpart;
+    gplusc = gpart + -.5*log(k0/(2*datum::pi))+pow(hpart, 2)/(2*k0);
+    // log(1 + e^x) = x unless x < large 
+    // for(int i=0; i<Sn; i++){
+    //   if(gplusc[i]<large){
+    // 	cumulant[i] = std::log(1+std::exp(gplusc[i]));
+    // 	cumulant2[i] = 1/(1+std::exp(-gplusc[i]));
+    // 	  } else{
+    // 	cumulant[i] = gplusc[i];
+    // 	cumulant2[i]=1;
+    //   }
+    // }
+    uvec small = find(gplusc<large);
     cumulant = gplusc;
-    small =find(gplusc<LARGE);
-    cumulant.elem(small)=log(1+exp(cumulant.elem(small) ));
-  }
-  if(updateGrad){
+    cumulant.elem(small) = log(1+exp(cumulant.elem(small)));
     cumulant2.ones();
-    cumulant2.elem(small) = pow((1+exp(-gplusc.elem(small))), -1); // aka e^x/(1+e^x)
+    cumulant2.elem(small) = 1/(1+exp(-gplusc.elem(small)));
   }
 }
 
 // Replace all coordinates
-double HurdleLikelihood::LL(vec th){
+double HurdleLikelihood::LL(const vec& th){
   //DPRINT("replace all. x.n_cols=" << x.n_cols <<"\n");
   for(int i=-1; i<k; i++){
-    DPRINT("i=" << i << "\n");
+    //    DPRINT("i=" << i << "\n");
     vec subth = th.elem(find(grp==i));
     populatePar(i, subth);
   }
@@ -139,7 +127,7 @@ double HurdleLikelihood::LL(vec th){
 
 //th parameters, grp groups
 //all others held fixed
-double HurdleLikelihood::LL(vec th, int grp){
+double HurdleLikelihood::LL(const vec& th, int grp){
   bool needUpdate = true;
   if(grp > -2) needUpdate = populatePar(grp, th);
   if(k0<=0) return(99999999);
@@ -147,7 +135,7 @@ double HurdleLikelihood::LL(vec th, int grp){
   double nloglik = sum(yI % gpart + y % hpart - cumulant) -.5*Sy2*k0;
   double pen = sum(lambda % pengrp);
   double negll = -(nloglik/Sn -pen);
-  DPRINT("negll=" << negll<<"\n");
+  //DPRINT("negll=" << negll<<"\n");
   return(negll);
 }
 
@@ -158,7 +146,7 @@ double HurdleLikelihood::LL(vec th, int grp){
    The rest collapses into a sum, so we use the linear sufficient stats,
    which are added to `Sdc` after we sum over `dc`.
  */
-vec HurdleLikelihood::grad(vec th, int grp, bool penalize){
+vec HurdleLikelihood::grad(const vec& th, int grp, bool penalize){
   vec dc(Sn, fill::zeros); //temp storage for derivatives in front of cumulant
   vec Sdc(th.n_elem, fill::zeros);
   vec pen(th.n_elem, fill::zeros);

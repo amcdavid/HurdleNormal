@@ -1,5 +1,6 @@
 context("Cpp")
 source('common.R', local=TRUE)
+set.seed(1234)
 test_that('Cpp: Converge under independence', {
     checkGrad(Indep, engine='cpp')
     err <- getLimit(Indep, engine='cpp')

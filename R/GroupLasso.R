@@ -36,10 +36,14 @@ cgpaths <- function(theta, y.zif, this.model, lambda=exp(seq(1, -5, length.out=1
 }
 
 solvePen <- function(theta, lambda, y.zif, this.model, control){
-    gll <- generatelogLik(y.zif, this.model, lambda)
-    grad <- generatelogLik(y.zif, this.model, lambda, returnGrad=TRUE)
+    hl <- HurdleLikelihood(y.zif, this.model, theta=theta, lambda=lambda)
+    subll <- function(b, th) hl$LL(th,b)
+    sg <- function(b, th) hl$grad(th,b, penalize=TRUE)
+    grad <- hl$gradAll
     ## use to test if gradient at 0 lies within lambda
-    grad0 <- generatelogLik(y.zif, this.model, lambda=0, returnGrad=TRUE)
+    sg0 <- function(b){
+        hl$grad(rep(0, 4), b, penalize=FALSE)
+    }
     p <- (length(theta)+1)/4   #actually p + 1
     blocks <- sapply(seq_len(p), function(x) which(x==coordmap(p)))
     round <- 0
@@ -49,13 +53,9 @@ solvePen <- function(theta, lambda, y.zif, this.model, control){
         theta0 <- theta
         for(b in seq_len(p)){ #blockupdates
             ## test if setting block to 0 is minimum
-            sg0 <- function(){
-                theta[blocks[[b]]] <- 0
-                grad0(theta)[blocks[[b]]]
-            }
             subtheta <- theta[blocks[[b]]]
             if(b != 1){
-                if(sqrt(sum(sg0()^2)) < lambda){
+                if(sqrt(sum(sg0(b)^2)) < lambda){
                     theta[blocks[[b]]] <- 0
                     if(control$debug>2) print(noquote(paste0('Zeroed block ', b, ', grad0 = ', sqrt(sum(sg0()^2)))))
                     next
@@ -63,23 +63,12 @@ solvePen <- function(theta, lambda, y.zif, this.model, control){
                     subtheta[] <- control$tol
                 }
             }
-
-            ## curry the log likelhood to hold other coords fixed
-            sg <- function(st){
-                theta[blocks[[b]]] <- st
-                grad(theta)[blocks[[b]]]
-            }
-            subll <- function(st){
-                theta[blocks[[b]]] <- st
-                gll(theta)
-            }
-            oo <- optim(subtheta, subll, sg, method='BFGS', control=control['maxit'])
-            
+            oo <- optim(subtheta, subll, sg, b=b, method='BFGS', control=control['maxit'])
             theta[blocks[[b]]] <- oo$par
         } # end blockupdates
         converged <- mean((theta-theta0)^2)<control$tol || round > control$maxrounds
         if(control$debug > 0){
-            if(control$debug>1 || (round %% 10)==0) print(noquote(paste0('penll=', round(gll(theta), 4), ' theta= ', paste(round(theta, 2), collapse=','))))
+            if(control$debug>1 || (round %% 10)==0) print(noquote(paste0('penll=', round(hl$LLall(theta), 4), ' theta= ', paste(round(theta, 2), collapse=','))))
         }
     } # end main loop
     structure(ifelse(abs(theta)<control$tol, 0, theta), flag=c(converged=converged, round=round))
