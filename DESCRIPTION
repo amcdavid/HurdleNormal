@@ -14,7 +14,7 @@ Imports:
     numDeriv,
     nloptr,
     ggplot2,
-    reshape
+    reshape,
 Suggests:
     testthat
 LinkingTo: RcppArmadillo,

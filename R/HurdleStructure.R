@@ -119,17 +119,19 @@ simulateHurdle210 <- function(N, p, dependence='G', structure='independence', st
     K <- K+t(K)
     H <- Hupper + t(Hlower)
     G <- G+t(G)
-    addIndices <- .additiveVstate(ncol(H))
-    norm <- .calcNormalizing(addIndices$states, H=H, K=K)
-    browser()
-    G[addIndices$indices] <- -log(norm$N)
+    diag(G) <- -13
+    ## addIndices <- .additiveVstate(ncol(H))
+    ## norm <- .calcNormalizing(addIndices$states, H=H, K=K)
 
-    Gprime <- matrix(c(-13.4, (-37.5 + 26.8)/2, 0,
-                       (-37.5 + 26.8)/2, -13.4, 0,
-                       0, 0, -13.4), nrow=3, ncol=3)
-    samp <- rGibbsHurdle(Gprime, H, K, Nt=20*N, thin=.1)
-    pairs(samp)
-
+    ## G[addIndices$indices] <- -log(norm$N)
+    ## Gprime <- matrix(c(-13.4, (-37.5 + 26.8)/2, 0,
+    ##                    (-37.5 + 26.8)/2, -13.4, 0,
+    ##                    0, 0, -13.4), nrow=3, ncol=3)
+    ## samp <- rGibbsHurdle(Gprime, H, K, Nt=20*N, thin=.1)
+    ## pairs(samp)
+    hs <- HurdleStructure(G, H, K)
+    hs <- getGibbs(hs, N/.1+2000, burnin=2000, thin=.1)
+    hs
 }
 
 
