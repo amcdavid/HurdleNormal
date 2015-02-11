@@ -9,8 +9,8 @@
 class HurdleLikelihood {
  private:
   static const int large=30;
-  enum  {G0=0, H0=1, K0=2}; 
-  enum {GAB = 0, HBA = 1, HAB =2, KAB=3};
+  static const int  G0=0, H0=1, K0=2;
+  static const int GBA = 0, HBA = 1, HAB =2, KBA=3;
   public:
   arma::vec y, yI; 			// response
   arma::mat x, xI;			// covariates
@@ -25,6 +25,7 @@ class HurdleLikelihood {
   arma::uvec small;
   arma::vec dc;
   arma::vec3 Sdc3;
+  const arma::vec3 pen3;
   arma::vec4 Sdc4, pen4;
   //linear sufficient statistics (that allow us to sum over the data)
   const double Sy2, Sy;

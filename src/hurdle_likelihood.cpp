@@ -10,6 +10,8 @@ HurdleLikelihood::HurdleLikelihood (const arma::vec& y_, const arma::mat& x_, co
     gba(x_.n_cols, fill::zeros), hba(x_.n_cols, fill::zeros), hab(x_.n_cols, fill::zeros), kba(x_.n_cols, fill::zeros),
     gpart(x_.n_rows, fill::zeros), hpart(x_.n_rows, fill::zeros),
     gplusc(x_.n_rows, fill::zeros), cumulant(x_.n_rows, fill::zeros), cumulant2(x_.n_rows, fill::zeros),
+    small(x_.n_rows, fill::zeros), dc(x_.n_rows, fill::zeros),
+    Sdc3(fill::zeros), pen3(fill::zeros), Sdc4(fill::zeros), pen4(fill::zeros),
     Sy2(sum(square(y_))), Sy(sum(y_)), SyI(999),
     Sn(x_.n_rows),k(x_.n_cols),
   SxI(x_.n_cols), Sx(x_.n_cols), SyIxI(x_.n_cols), SyIx(x_.n_cols),
@@ -44,28 +46,28 @@ HurdleLikelihood::HurdleLikelihood (const arma::vec& y_, const arma::mat& x_, co
     bool changed=true;
     //update param and cross products
     if(grp == -1){ //intercept
-      changed = std::abs(g0-th(0))> datum::eps || 
-      	std::abs(h0-th(1))>datum::eps || std::abs(k0-th(2))>datum::eps;
+      changed = std::abs(g0-th(G0))> datum::eps || 
+      	std::abs(h0-th(H0))>datum::eps || std::abs(k0-th(K0))>datum::eps;
       if(changed){
 	//	DPRINT("gpart(0)=" << gpart(0));
-	gpart += (th(0)-g0);
-	hpart += (th(1)-h0);
-	g0 = th(0), h0=th(1), k0=th(2);
+	gpart += (th(G0)-g0);
+	hpart += (th(H0)-h0);
+	g0 = th(G0), h0=th(H0), k0=th(K0);
 	//	DPRINT("gpart(0)=" << gpart(0));
       }
     } else{ //covariates
-      changed = std::abs(gba(grp)-th(0))> 0 || 
-      std::abs(hba(grp)-th(1))>0 || 
-      std::abs(hab(grp)-th(2))>0 ||
-      std::abs(kba(grp)-th(3))>0;
+      changed = std::abs(gba(grp)-th(GBA))> 0 || 
+      std::abs(hba(grp)-th(HBA))>0 || 
+      std::abs(hab(grp)-th(HAB))>0 ||
+      std::abs(kba(grp)-th(KBA))>0;
 	if(changed){
 	  DPRINT("gpart(0)=" << gpart(0));
-	  gpart += (2*xI.col(grp)*(th(0)-gba(grp)) + 
-		    x.col(grp)*(th(1)-hba(grp)));
-	  hpart +=  (xI.col(grp)*(th(2)-hab(grp)) - 
-		     x.col(grp)*(th(3)-kba(grp)));
+	  gpart += (2*xI.col(grp)*(th(GBA)-gba(grp)) + 
+		    x.col(grp)*(th(HBA)-hba(grp)));
+	  hpart +=  (xI.col(grp)*(th(HAB)-hab(grp)) - 
+		     x.col(grp)*(th(KBA)-kba(grp)));
 	  // //	  DPRINT("gpart(0)=" << gpart(0));
-	  gba(grp)=th(0), hba(grp)=th(1), hab(grp)=th(2), kba(grp)=th(3);
+	  gba(grp)=th(GBA), hba(grp)=th(HBA), hab(grp)=th(HAB), kba(grp)=th(KBA);
 	  pengrp(grp) = sqrt(sum(square(th)));
 	  DPRINT("Updated\n");
 	} else{
@@ -106,7 +108,7 @@ void HurdleLikelihood::updateGroupSums(bool updateSums, bool updateGrad){
     // 	cumulant2[i]=1;
     //   }
     // }
-    uvec small = find(gplusc<large);
+    small = find(gplusc<large);
     cumulant = gplusc;
     cumulant.elem(small) = log(1+exp(cumulant.elem(small)));
     cumulant2.ones();
@@ -147,33 +149,29 @@ double HurdleLikelihood::LL(const vec& th, int grp){
    which are added to `Sdc` after we sum over `dc`.
  */
 vec HurdleLikelihood::grad(const vec& th, int grp, bool penalize){
-  vec dc(Sn, fill::zeros); //temp storage for derivatives in front of cumulant
-  vec Sdc(th.n_elem, fill::zeros);
-  vec pen(th.n_elem, fill::zeros);
-
   bool needUpdate = populatePar(grp, th);
   updateGroupSums(needUpdate, true);
   if(grp==-1){//intercepts
-    //dc.col(0)=1 - cumulant2;
-    Sdc(0) = SyI - sum(cumulant2);//gbb
+    Sdc3(G0) = SyI - sum(cumulant2);//gbb
     dc = (hpart/k0) % cumulant2; //hbb
-    Sdc(1) = Sy - sum(dc); //yb * dh/dhbb + dc
+    Sdc3(H0) = Sy - sum(dc); //yb * dh/dhbb + dc
     dc = -(square(hpart)+k0)/(std::pow(k0,2)*2) % cumulant2;
-    Sdc(2) = -.5*Sy2 - sum(dc);
+    Sdc3(K0) = -.5*Sy2 - sum(dc);
+    return(-Sdc3/Sn);
   } else{
     dc = ( 2*xI.col(grp) + 0 ) % cumulant2; //gba
-    Sdc(0) = 2*SyIxI(grp)-sum(dc);
+    Sdc4(GBA) = 2*SyIxI(grp)-sum(dc);
     dc = (x.col(grp) + 0) % cumulant2;  //hba
-    Sdc(1) = SyIx(grp) - sum(dc);
+    Sdc4(HBA) = SyIx(grp) - sum(dc);
     dc = (0 + xI.col(grp)/k0 % hpart) % cumulant2; //hab
-    Sdc(2) = SyxI(grp) - sum(dc);
+    Sdc4(HAB) = SyxI(grp) - sum(dc);
     dc = -(x.col(grp)/k0 % hpart) % cumulant2; //kba
-    Sdc(3) = -Syx(grp) - sum(dc);
+    Sdc4(KBA) = -Syx(grp) - sum(dc);
     if(penalize){
       ASSERT_TRUE(any(abs(th)>0) || lambda(grp)<datum::eps)
-      pen = th / pengrp(grp) * lambda(grp);
+      pen4 = th / pengrp(grp) * lambda(grp);
+      return(-Sdc4/Sn + pen4);
     }
+    return(-Sdc4/Sn);
   }
-  //handle penalty
-  return(-Sdc/Sn + pen);
 }
