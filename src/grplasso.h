@@ -9,11 +9,10 @@
 class PenalizedLikelihood
 {
 public:
-virtual double LL(const arma::vec& th, int grp) = 0;
-virtual arma::vec grad(const arma::vec& th, int grp, bool penalize) = 0;
-virtual arma::mat hessian(const arma::vec& th, int grp) = 0;
-virtual void setLambda(const arma::vec& lambda_) = 0;
-  
+  virtual double LL(const arma::vec& th, int grp, bool penalize) = 0;
+  virtual arma::vec grad(const arma::vec& th, int grp, bool penalize, bool updatePar) = 0;
+  virtual arma::mat hessian(const arma::vec& th, int grp) = 0;
+  virtual void setLambda(const arma::vec& lambda_) = 0;
 };
 
 class GrpLassoPath
