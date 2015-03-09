@@ -54,7 +54,6 @@ checkGrad <- function(hs, j=1, theta, lambda=0, engine='R'){
     hl <- HurdleLikelihood(sample[,j], sample[,-j, drop=FALSE], theta=theta, lambda=lambda)
     gnum <- grad(hl$LLall, theta)
     ganalytic <- hl$gradAll(theta)
-    ##browser()
     expect_equal(hl$LLall(theta), glR(theta), tolerance=1e-6, check.names=FALSE)
     expect_equal(hl$gradAll(theta), grR(theta), tolerance=1e-6, check.names=FALSE)
 } else{

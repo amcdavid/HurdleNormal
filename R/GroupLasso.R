@@ -20,15 +20,43 @@
 ##' @return matrix of parameters, one row per lambda
 ##' @useDynLib HurdleNormal
 ##' @importFrom Rcpp sourceCpp
-cgpaths <- function(y.zif, this.model, nlambda=100, lambda, lambda.min.ratio=if(length(y.zif)<ncol(this.model)) .005 else .05, control=list(tol=1e-5, maxrounds=300, maxit=500, debug=1)){
-    defaultControl <- list(tol=1e-6, maxrounds=300, maxit=500, debug=0)
+cgpaths <- function(y.zif, this.model, nlambda=100, lambda, lambda.min.ratio=if(length(y.zif)<ncol(this.model)) .005 else .05, control=list(tol=1e-5, maxrounds=300, maxit=500, debug=1), standardize=FALSE){
+    defaultControl <- list(tol=1e-6, maxrounds=300, maxit=500, debug=0, method='proximal', stepsize=.4)
     nocontrol <- setdiff(names(defaultControl), names(control))
     control[nocontrol] <- defaultControl[nocontrol]
+    method <- match.arg(control$method, c('block', 'proximal'))
     p <- ncol(this.model)+1
     n <- nrow(this.model)
     blocks <- sapply(seq_len(p), function(x) which(x==coordmap(p)))
     theta <- coordmap(p)
     theta[theta!=1] <- 0
+
+    scal <- rep(1, p)
+    loc <- rep(0, p)
+    cond.scale <- function(x){
+        xI <- abs(x)>control$tol
+        if(sum(xI)<2){
+            loc <- 0
+            scale <- 1             
+        } else{
+            loc <- mean(x[xI])
+            scale <- sd(x[xI])
+        }
+        list(z=(x-loc)/scale, loc=loc, scale=scale)
+    }
+    
+    if(standardize){
+        s <- cond.scale(y.zif)
+        y.zif <-s$z
+        scal[1] <- s$scale
+        loc[1] <- s$loc
+        for(i in seq(2,p)){
+            s <- cond.scale(this.model[,i-1])
+            this.model[,i-1] <- s$z
+            scal[i] <- s$scale
+            loc[i] <- s$loc
+        }
+    }
 
     ## get likelihood object
     hl <- HurdleLikelihood(y.zif, this.model, theta=theta, lambda=0)
@@ -39,14 +67,20 @@ cgpaths <- function(y.zif, this.model, nlambda=100, lambda, lambda.min.ratio=if(
         hl$grad(rep(0, 4), b, penalize=FALSE)
     }
     LLall <- function(th) hl$LLall(th)
+
+    if(method=='proximal') gradAll <- hl$gradAll
+    
     ## value for empty sol
-    l0 <- getLambda0(theta, subll, sg, sg0, control, p, blocks)
+    gl0 <- getLambda0(theta, subll, sg, sg0, control, p, blocks)
+    l0 <- gl0$lambda0
+    theta <- gl0$theta0
+    if(l0<0) stop('Negative lambda0 should not happen')
     if(missing(lambda)) lambda <- 10^seq(log10(1.05*l0), log10(l0*lambda.min.ratio), length.out=nlambda)
  #                                            
   #                                           if(p<n) 3 else (n/p), length.out=nlambda)
     out <- matrix(NA, nrow=length(lambda), ncol=length(theta))
     kktout <- matrix(NA, nrow=length(lambda), ncol=p)
-    flout <- matrix(NA, nrow=length(lambda), ncol=4)
+    flout <- matrix(NA, nrow=length(lambda), ncol=5)
     colnames(out) <- parmap(p)
     rownames(kktout) <- rownames(flout) <- rownames(out) <- lambda
     jerr <- rep(0, length(lambda))
@@ -54,7 +88,10 @@ cgpaths <- function(y.zif, this.model, nlambda=100, lambda, lambda.min.ratio=if(
     
     for(l in seq_along(lambda)){
         hl$setLambda(lambda[l])
-        sp <-solvePen(theta, lambda[l], control, p, blocks, subll, sg, sg0, LLall)      
+        if(method=='block'){
+            sp <-solvePen(theta, lambda[l], control, p, blocks, subll, sg, sg0, LLall, loc, scal)      } else{ #proximal
+            sp <- solvePenProximal(theta, lambda[l], control, p, blocks, subll, sg0, sg, LLall, gradAll, loc, scal)
+        }
         theta <- out[l,] <- sp
         kktout[l,] <- attr(sp, 'kkt')
         flout[l,] <- attr(sp, 'flag')
@@ -73,10 +110,79 @@ getLambda0 <- function(theta, subll, sg, sg0, control, p, blocks){
     theta[blocks[[1]]] <- o$par
     subll(1, theta[blocks[[1]]])
     subgrad <- sapply(2:p, function(b) sqrt(sum(sg0(b)^2)))
-    max(subgrad)
+    list(lambda0=max(subgrad), theta0=theta)
 }
 
-solvePen <- function(theta, lambda, control, p, blocks,  subll, sg, sg0, LLall){
+solvePenProximal <- function(theta, lambda, control, p, blocks, subll, sg0, sg, LLall, gradAll, loc, scal){
+    feval <- geval <- 0
+    round <- 0
+    converged <- FALSE
+    kkt <- Inf
+    ## thetaPrime is previous point, theta is proximal proposed point
+    thetaPrime <- theta
+    beta <- beta0 <- 1
+    betaw <- .95
+    while(!converged){
+        round <- round+1
+        ##theta0 <- theta
+        ## solve unpenalized block exactly (because of stepsize awkwardness)
+        thisll <- LLall(thetaPrime)
+        th0 <- thetaPrime[blocks[[1]]]        
+        O <- optim(th0, subll, sg, method='BFGS', b=1)
+        feval <- feval+O$counts['function']
+        geval <- geval+O$counts['gradient']
+        thetaPrime[blocks[[1]]] <- O$par
+        thisll <- O$value
+        gr <- gradAll(thetaPrime, penalize=FALSE)
+        stopifnot(mean(gr[blocks[[1]]]^2)<mean(gr^2))
+        theta <- thetaPrime-beta*gr
+        ##message('grad=', paste(round(gr,2), collapse=','), '\ntheta=', paste(round(theta,2), collapse=','))
+        geval <- geval+length(blocks)
+        for(b in seq(2, p)){ ##project block onto group lasso penalty
+            subtheta <- theta[blocks[[b]]]
+            suml2 <- sqrt(sum(subtheta^2))
+            if(suml2 < lambda*beta){ # is 0 the minimum?
+                theta[blocks[[b]]] <- 0
+                if(control$debug>2) print(noquote(paste0('Zeroed block ', b, ', |subtheta|_2 = ', suml2)))
+            } else{ #otherwise, just contract a bit
+                theta[blocks[[b]]] <- subtheta*(1-lambda*beta/suml2)
+            }
+            
+        } # end blockupdates
+
+        newll <- LLall(theta)
+        if(newll>thisll){
+            beta <- beta*control$stepsize
+            if(beta<.01) warning('Null step size')
+            if(control$debug>2) message('beta= ', beta)
+        } else{
+            beta <- beta*betaw+beta0*(1-betaw)
+            thetaPrime <- theta
+            kkt <- sapply(seq_len(p), function(b){
+                subtheta <- thetaPrime[blocks[[b]]]
+                if(all(abs(subtheta)<control['tol'])){
+                    if(sqrt(sum(sg0(b)^2))<lambda) return(0L) else return(-99L)
+                } 
+                else return(sum(sg(b, subtheta)^2))
+            })
+        }
+        
+        
+        geval <- geval+p+1
+        
+        ## message('kkt=', paste(round(kkt,2), collapse=','))
+        converged <- all(abs(kkt)<control$tol) || (round > control$maxrounds)
+#        thetaExtrap <- theta + (theta-theta0)*(round-1)/(round+10)
+        feval <- feval+p+1
+        if(control$debug > 0){
+            if(control$debug>1 || (round %% 10)==0) print(noquote(paste0('penll=', round(thisll, 4), ' theta= ', paste(round(theta, 2), collapse=','), 'beta= ', beta )))
+        }
+    } # end main loop
+
+    structure(ifelse(abs(theta)<control$tol, 0, theta), flag=c(converged=converged, round=round, geval=geval, feval=feval, beta=beta), kkt=kkt)        
+}
+
+solvePen <- function(theta, lambda, control, p, blocks,  subll, sg, sg0, LLall, loc, scal){
     feval <- geval <- 0
     round <- 0
     converged <- FALSE
@@ -101,19 +207,21 @@ solvePen <- function(theta, lambda, control, p, blocks,  subll, sg, sg0, LLall){
             geval <- geval+oo$counts['gradient']
             theta[blocks[[b]]] <- oo$par
         } # end blockupdates
-        converged <- mean((theta-theta0)^2)<(control$tol)^2 || round > control$maxrounds
+
+        kkt <- sapply(seq_len(p), function(b){
+            subtheta <- theta[blocks[[b]]]
+            if(all(abs(subtheta)<control['tol'])){
+                if(sqrt(sum(sg0(b)^2))<lambda) return(0L) else return(-99L)
+            } 
+            else return(sum(sg(b, subtheta)^2))
+        })
+
+        converged <- all(abs(kkt)<control$tol) || (round > control$maxrounds)
         if(control$debug > 0){
             if(control$debug>1 || (round %% 10)==0) print(noquote(paste0('penll=', round(LLall(theta), 4), ' theta= ', paste(round(theta, 2), collapse=','))))
         }
     } # end main loop
 
-    kkt <- sapply(seq_len(p), function(b){
-        subtheta <- theta[blocks[[b]]]
-        if(all(abs(subtheta)<control['tol'])){
-            if(sqrt(sum(sg0(b)^2))<lambda) return(0L) else return(-99L)
-        } 
-        else return(sum(sg(b, subtheta)^2))
-    })
         geval <- geval+p
-    structure(ifelse(abs(theta)<control$tol, 0, theta), flag=c(converged=converged, round=round, geval=geval, feval=feval), kkt=kkt)
+    structure(ifelse(abs(theta)<control$tol, 0, theta), flag=c(converged=converged, round=round, geval=geval, feval=feval, beta=1), kkt=kkt)
 }
