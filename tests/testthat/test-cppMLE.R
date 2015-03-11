@@ -7,6 +7,16 @@ test_that('Cpp: Converge under independence', {
     expect_false(any(diff(err)>0))
 })
 
+test_that('Unpenalized likelihood matches', {
+    sample <- Indep$gibbs
+    par <- parmap(ncol(sample))
+    theta <- setNames(rep(2, length(par)), par)
+    hl <- HurdleLikelihood(sample[,1], sample[,-1, drop=FALSE], theta=theta, lambda=1)
+    hl0 <- HurdleLikelihood(sample[,1], sample[,-1, drop=FALSE], theta=theta, lambda=0)
+    expect_equal(hl$LLall(theta, penalize=FALSE), hl0$LLall(theta, penalize=TRUE))   
+
+})
+
 
 test_that('Cpp: Converge under K dependence', {
     checkGrad(Kdep2, engine='cpp')

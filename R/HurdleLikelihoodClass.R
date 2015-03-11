@@ -43,7 +43,7 @@ setMethod( "$", "HurdleLikelihood", function(x, name ) {
     }  else if(name == 'setLambda'){
         function(lambda) HurdleLikelihood_setLambda(x,lambda)
     }else if(name=='LLall'){
-        function(theta, penalize) .Call(HurdleLikelihood_method('LLall'), x@pointer, theta, penalize=TRUE)
+        function(theta, penalize=TRUE) .Call(HurdleLikelihood_method('LLall'), x@pointer, theta, penalize=penalize)
     }else {
         function(...) .Call(HurdleLikelihood_method(name), x@pointer, ... )
     }

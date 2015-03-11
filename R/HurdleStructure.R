@@ -119,10 +119,16 @@ simulateHurdle210 <- function(N, p, dependence='G', structure='independence', st
     K <- K+t(K)
     H <- Hupper + t(Hlower)
     G <- G+t(G)
-    diag(G) <- -13
+    #knz <- abs(K[upper.tri(K)])>0
+    knz <- abs(K)>0
+    knz[] <- ifelse(runif(length(knz))<.2, FALSE, knz)
+    knz <- knz & t(knz)
+    diag(knz) <- FALSE
+    H[knz] <- 3.5*K[knz]
+    G[knz] <- G[knz]-1.5*K[knz]
+    diag(G) <- -14
     ## addIndices <- .additiveVstate(ncol(H))
     ## norm <- .calcNormalizing(addIndices$states, H=H, K=K)
-
     ## G[addIndices$indices] <- -log(norm$N)
     ## Gprime <- matrix(c(-13.4, (-37.5 + 26.8)/2, 0,
     ##                    (-37.5 + 26.8)/2, -13.4, 0,
