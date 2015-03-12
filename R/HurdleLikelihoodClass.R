@@ -27,7 +27,8 @@ HurdleLikelihood_setLambda <- function(x, lambda){
     stopifnot(is.numeric(lambda))
     if(length(lambda)==1) lambda <- rep(lambda, x@p-1)
     stopifnot(length(lambda)==x@p-1)
-    .Call(HurdleLikelihood_method('setLambda'), x@pointer, lambda)
+    x@pointer <- .Call(HurdleLikelihood_method('setLambda'), x@pointer, lambda)
+    NULL
 }
 
 

@@ -275,11 +275,12 @@ RcppExport SEXP HurdleLikelihood__gradAll(SEXP xp, SEXP th_, SEXP penalize_){
   return wrap(res);
 }
 
-RcppExport void HurdleLikelihood__setLambda(SEXP xp, SEXP lambda_){
+RcppExport SEXP HurdleLikelihood__setLambda(SEXP xp, SEXP lambda_){
   // grab the object as a XPtr (smart pointer)
   Rcpp::XPtr<HurdleLikelihood> ptr(xp);
   arma::vec lambda = as<arma::vec>(lambda_);
   ptr->setLambda(lambda);
+  return ptr;
 }
 
 //debugging code follows
@@ -328,3 +329,7 @@ RcppExport SEXP HurdleLikelihood__kba(SEXP xp) {
   return wrap(ptr->kba);
 }
 
+RcppExport SEXP HurdleLikelihood__lambda(SEXP xp) {
+  Rcpp::XPtr<HurdleLikelihood> ptr(xp);
+  return wrap(ptr->lambda);
+}
