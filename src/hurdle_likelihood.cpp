@@ -37,6 +37,7 @@ HurdleLikelihood::HurdleLikelihood (const arma::vec& y_, const arma::mat& x_, co
    grpm4(GBA)=pm(tGBA); grpm4(HBA)=pm(tHBA); grpm4(HAB)=pm(tHAB); grpm4(KBA)=pm(tKBA);
   // populate params
    populatePar(th);
+   updateGroupSums();
 
     DPRINT("Finished construction. dim(gpart)=" << gpart.n_rows << "gpart(0)=" << gpart(0)<<"\n");
 }
@@ -178,7 +179,7 @@ vec HurdleLikelihood::grad(const vec& th, bool penalize){
   arma::uvec4 thIndex(grpm4); //current index into theta
   // we should be taking subvectors of th, but it doesn't matter here
   gvec.elem(grpm3) = grad(th, -1, penalize, false);
-  for(uint u=0;u<k; u++){
+  for(int u=0;u<k; u++){
     gvec.elem(thIndex)=grad(th.elem(thIndex), u, penalize, false);
     thIndex++;
   }
