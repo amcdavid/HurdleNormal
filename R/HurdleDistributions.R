@@ -6,8 +6,8 @@ logit <- function(x) log(x/(1-x))
     stopifnot(ncol(H)==nrow(H))
     stopifnot(dim(G)==dim(H))
     stopifnot(dim(K)==dim(H))
-    stopifnot(all.equal(t(G), G))
-    stopifnot(all.equal(t(K), K))
+    stopifnot(all.equal(t(G), G, check.attributes=FALSE))
+    stopifnot(all.equal(t(K), K, check.attributes=FALSE))
     eK <- eigen(K, only.values=TRUE)$values
     stopifnot(all(eK>0) &&  all(Im(eK)==0))
     if(!missing(x)) stopifnot(length(x) == ncol(H) || nrow(x)==ncol(H))
@@ -67,28 +67,42 @@ dHurdle210 <- function(x, G, H, K, tol=5e-2){
     list(states=states, indices=cbind(rv, cv))
 }
 
-.calcNormalizing <- function(statevec, H, K){
-    .checkArgs(G=diag(1, nrow(H)), H=H, K=K)
+.calcNormalizing <- function(statevec, subsample=Inf, v, G, H, K, returnCovariance=FALSE, log=TRUE){
+    .checkArgs(G=G, H=H, K=K)
     p <- ncol(H)
+    
+    if(!missing(v)){
+        statevec <- sum(2^(v-1))
+    }
+    
     if(missing(statevec)){
-        nstate <- 2^p
-        statevec <- seq(from=1, to=nstate-1)
+        nstate <- 2^p-1
+        statevec <- if(subsample<Inf) stop('Not implemented') else  seq(1L, nstate)
     } else{
         nstate <- length(statevec)
     }
-    if(nstate>=1024) stop('Too hazardous')
-    N <- rep(NA, nstate)
+    if(nstate>=1e6) stop('Too hazardous')
+    logP <- N <- rep(NA, nstate)
     #N[1] <- 1
-    state <- matrix(FALSE, nrow=nstate, ncol=ncol(H))
+    state <- matrix(FALSE, nrow=p, ncol=nstate)
+    mu <- matrix(0, nrow=p, ncol=nstate)
+    if(returnCovariance) Sigma <- array(0, dim=c(p, p, nstate)) else Sigma <- NULL
     for(i in seq_len(nstate)){
         v <- statevec[i]
         bits <- as.logical(intToBits(v)[1:p])
-        state[i,] <- bits
+        state[,i] <- bits
         subK <- K[bits,bits,drop=FALSE]
+        cov <- solve(subK)
+        if(returnCovariance) Sigma[bits,bits,i] <- cov
         subH <- t(crossprod(bits, H))[bits,,drop=F]      #H order is wrong throughout, since 1y is supposed to be a selector, eg eq 6?  Can we fix by inverting 6?
-        N[i] <- det(subK/(2*pi))^(-.5)*exp(.5*t(subH) %*% solve(subK) %*% subH)
+        submu <- cov %*% subH
+        mu[bits,i] <- submu
+        N[i] <- .5*(t(subH) %*% submu -  determinant(subK/(2*pi), log=TRUE)$modulus)
+        logP[i] <- sum(G[bits, bits]) + N[i]
+        if(!log) N[i] <- exp(N[i])
+
     }
-    list(N=N, state=state)
+    list(N=N, state=state, mu=mu, logP=logP,Sigma=Sigma)
 }
 
 

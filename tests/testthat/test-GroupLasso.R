@@ -15,7 +15,7 @@ test_that('Can fit', {
     this.model <- rgh[,-1,drop=FALSE]
     theta <- c(gbb=-10, 0, 0, hbb=10, 0, 0, 0, 0, 0, 0, 1)+.02
     names(theta) <- parmap(3)
-    lambda <- c(2.8, 1, .8, .7, .6, .5, .3, .1, .05, .01, 0)
+    lambda <- c(2.8, 1, .8, .7, .6, .5, .3, .1, .1, .05, .05, .01, 0)
     paths1 <- cgpaths(y.zif, this.model, lambda=lambda, control=list(tol=1e-9, maxrounds=2000, debug=0, method='proximal', stepsize=3, updatehess=200), standardize=FALSE)
     paths2 <- cgpaths(y.zif, this.model, lambda=lambda, control=list(tol=1e-5, maxrounds=2000, debug=0, method='block'), standardize=FALSE)
     hm <- HurdleLikelihood(y.zif, this.model, theta=paths1$path[13,], lambda=0)

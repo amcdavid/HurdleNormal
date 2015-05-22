@@ -1,4 +1,4 @@
-HurdleStructure <- function(G=NULL, H=NULL, K=NULL, sample=NULL, gibbs=NULL, estimate=NULL){
+HurdleStructure <- function(G=NULL, H=NULL, K=NULL, sample=NULL, gibbs=TRUE, estimate=NULL){
     if(!is.null(G)){
         .checkArgs(G=G, H=H, K=K)
     } else if(!is.null(sample) || !is.null(gibbs)){
@@ -11,16 +11,51 @@ HurdleStructure <- function(G=NULL, H=NULL, K=NULL, sample=NULL, gibbs=NULL, est
     } else{
         stop('Empty constructor')
     }
+    true <- list(G=G, H=H, K=K)
+    if(isTRUE(gibbs)) gibbs <- getGibbs(list(true=true))$gibbs
 
-    li <- list(true=list(G=G, H=H, K=K), sample=sample, gibbs=gibbs, estimate=estimate)
+    trueFactor <- sign(K)+2^sign(H)+4^sign(G)
+    Kt <- signToChar(K, 'K')
+    Ht <- signToChar(H, 'H')
+    Gt <- signToChar(G, 'G')
+    trueChar <- paste0(Kt, Ht, Gt)
+    trueFactor <- matrix(trueFactor, nrow=nrow(G))
+    trueChar <- matrix(trueChar, nrow=nrow(G))
+
+    li <- list(true=true, sample=sample, gibbs=gibbs, estimate=estimate, norm=NULL, trueFactor=trueFactor, trueChar=trueChar)
     class(li) <- c('list', 'HurdleStructure')
     li
+}
+
+signToChar <- function(v, char) {
+    char <- c(paste0('-', char),
+              '',
+              paste0('+', char))
+    char[sign(v)+2]
+}
+
+getNormalizing <- function(hs, subsample=Inf){
+    ##sample(seq(from=1L, to=nstate-1L), subsample) else
+    
+    norm <- .calcNormalizing(G=hs$true$G, H=hs$true$H, K=hs$true$K, log=TRUE)
+    maxP <- max(norm$logP)
+    state0 <- 0-maxP
+    logP0 <- -(log(sum(exp(norm$logP-maxP))+
+                    exp(state0)          #state 0
+                  )+maxP)
+    P <- exp(norm$logP +logP0)
+    margins <- colSums(t(norm$state)*P)
+    list(logP0=logP0, P=c(exp(logP0), P), margins=margins, lMargin=colSums(t(norm$stat)*norm$logP), mu=norm$mu)
 }
 
 getGibbs <- function(hs, Nt=2000, ...){
     if(!is.null(hs$gibbs)) message("Replacing gibbs sample")
     gibbs <- with(hs$true, rGibbsHurdle(G, H, K, Nt=Nt, ...))
+    ct <- cor.test(gibbs[-1,1], gibbs[-nrow(gibbs),
+                                  1], conf.level=.99)$conf.int[1]
+    if(!is.na(ct) && ct >.1) warning('Significant auto correlation found')
     hs$gibbs <- gibbs
+    
     hs
 }
 
@@ -76,6 +111,15 @@ getConditionalMLE <- function(hs,using='gibbs', testGrad=FALSE, engine='R', ...)
     list(Parm=Parm, Separm=Separm)
 }
 
+momentChar <- function(hs, v){
+    norm <- .calcNormalizing(v=v, H=hs$true$H, K=hs$true$K, log=TRUE)
+    logP <- sum(hs$true$G[v,v]) +  norm$N
+    cov <- solve(norm$subK)
+    mu <- norm$mu
+    list(logP=logP, cov=cov, mu=mu)
+    
+}
+
 getJoint <- function(fit){
     C <- lapply(cast(fit$Parm, i~j | par), function(x) as.matrix(x[,-1]))
     G <- C$gba
@@ -90,9 +134,10 @@ getJoint <- function(fit){
 }
 
 
-simulateHurdle210 <- function(N, p, dependence='G', structure='independence', structureArgs=list(sparsity=.1, groupwise=FALSE), intensityArgs=list(G=1, Hupper=1, Hlower=1, K=-.3), Hdiag=5, Kdiag=1, G0odds=0){
+simulateHurdle210 <- function(N, p, dependence='G', structure='independence', structureArgs=list(sparsity=.1, groupwise=FALSE), intensityArgs=list(G=1, Hupper=1, Hlower=1, K=-.3, gamma=1), Gdiag=-14, Hdiag=5, Kdiag=1, tweak=NULL, tweakArgs=list(lH0=4, lG0 =2)){
     dependence <- match.arg(dependence, c('G', 'Hupper', 'Hlower', 'K'), several.ok=TRUE)
     structure <- match.arg(structure, c('independence', 'sparse', 'chain'))
+    if(!is.null(tweak)) tweak <- match.arg(tweak, c("G", "GH"))
     Hlower <- Hupper <- diag(Hdiag, p)/2
     K <- diag(Kdiag, p)/2
     G <- matrix(0, p, p)
@@ -106,7 +151,7 @@ simulateHurdle210 <- function(N, p, dependence='G', structure='independence', st
             offdiag <- p*(p-1)/2
             nnz <- ceiling(structureArgs$sparsity*offdiag)
             depidx <- if(nnz>1) sample(offdiag, nnz) else 1 #let's use the 1,2 entry unless we need more than one dependence
-            depMat[upper.tri(depMat)][depidx] <- intensityArgs[[d]]
+            depMat[upper.tri(depMat)][depidx] <- intensityArgs[[d]]*sign(intensityArgs[['gamma']]-runif(length(depidx)))
         } else if(structure=='chain'){
             depidx <- cbind(i=seq_len(p-1), j=2:p)
             depMat[depidx] <- intensityArgs[[d]]
@@ -115,28 +160,64 @@ simulateHurdle210 <- function(N, p, dependence='G', structure='independence', st
         ourMat <- get(d)+depMat
         assign(d, ourMat)
     }
-    
     K <- K+t(K)
     H <- Hupper + t(Hlower)
     G <- G+t(G)
-    #knz <- abs(K[upper.tri(K)])>0
-    knz <- abs(K)>0
-    knz[] <- ifelse(runif(length(knz))<.2, FALSE, knz)
+    diag(G) <- Gdiag
+    tweakmat <- G
+    if(!is.null(tweak)){
+        if(tweak=='GH') tweakmat <- K
+        lH0 <- tweakArgs[['lH0']]
+        lG0 <- tweakArgs[['lG0']]
+    } else{
+        lG0 <- lH0 <- 0
+    }
+    knz <- abs(tweakmat)>0
     knz <- knz & t(knz)
     diag(knz) <- FALSE
-    H[knz] <- 3.5*K[knz]
-    G[knz] <- G[knz]-1.5*K[knz]
-    diag(G) <- -14
-    ## addIndices <- .additiveVstate(ncol(H))
-    ## norm <- .calcNormalizing(addIndices$states, H=H, K=K)
-    ## G[addIndices$indices] <- -log(norm$N)
-    ## Gprime <- matrix(c(-13.4, (-37.5 + 26.8)/2, 0,
-    ##                    (-37.5 + 26.8)/2, -13.4, 0,
-    ##                    0, 0, -13.4), nrow=3, ncol=3)
-    ## samp <- rGibbsHurdle(Gprime, H, K, Nt=20*N, thin=.1)
-    ## pairs(samp)
-    hs <- HurdleStructure(G, H, K)
+    anynz <- abs(K) |abs(G)>0 | abs(H)>0
+    diag(anynz) <- FALSE
+
+    tweakOffDiag <- function(HS, lH, lG){
+        HS$true$H[knz] <- lH*tweakmat[knz]
+        if(!is.null(tweak) && tweak=='GH'){
+            HS$true$G[knz] <- lG*tweakmat[knz]
+        }
+        HS <- suppressWarnings(getGibbs(HS))
+        margins <- round(colMeans(abs(HS$gibbs)>0), 2)
+        message(paste(margins, collapse=','))
+        G <- HS$true$G
+        message('Before: ', paste(round(diag(G), 2), collapse=','))
+        diag(G) <- diag(G)-log((margins+.01)/(1.01-margins))
+        message('After: ', paste(round(diag(G),2), collapse=','))
+        HS$true$G <- G
+        HS
+    }
+    hs <- HurdleStructure(G, H, K, gibbs=FALSE)
+    hs <- tweakOffDiag(hs, lH0, lG0)
+
+    if(!is.null(tweak)){
+    jamPcor <- function(lH=lH0, lG=lG0){
+        message('**lH= ', round(lH, 2), 'lG = ', round(lG, 2), '**')
+        hs <- tweakOffDiag(hs, lH, lG)
+        rho <- as.matrix(pcor.shrink(hs$gibbs, lambda=.15))
+        diag(rho) <- 0
+        obj <- sum( (2*anynz-1)*abs(rho))
+        message('--obj=', obj, '--')
+        obj
+    }
+    O2 <- optimize(jamPcor, c(-2, lH0+3), tol=.15, lG=lG0)
+    lH0 <- O2$min
+    if(tweak=='GH'){
+        O <- optimize(jamPcor, c(-lG0-1, lG0), tol=.15, lH=lG0)
+        lG0 <- O$min
+    }
+    message('lH=', lH0, 'lG= ', lG0)
+}
+    hs <- tweakOffDiag(hs, lH0, lG0)
     hs <- getGibbs(hs, N/.1+2000, burnin=2000, thin=.1)
+    margins <- colMeans(abs(hs$gibbs)>0)
+    message(paste(margins, collapse=','))
     hs
 }
 
@@ -155,3 +236,20 @@ simulateHurdle210 <- function(N, p, dependence='G', structure='independence', st
 ## b12 <- lm(samp[,1] ~ samp[,2] + I(samp[,2]>0), subset=samp[,1]>0) #discrete significant
 ## g21 <- glm(samp[,2] >0 ~ samp[,1]+I(samp[,1]>0), family='binomial') #continuous significant
 ## b21 <- lm(samp[,2] ~ samp[,1] + I(samp[,1]>0), subset=samp[,2]>0) 
+
+blockHS <- function(mat, times){
+    m2 <- mat
+    diag(m2) <- 0
+    htile <- do.call(cbind, rep(list(m2), times=times))
+    vtile <- do.call(rbind, rep(list(htile), times=times))
+    diag(vtile) <- rep(diag(mat), times)
+    vtile
+}
+
+hcenter <- function(samp){
+   apply(samp, 2, function(x){
+             xI <- abs(x)>0
+             x[xI] <- scale(x[xI], scale=FALSE)
+             x
+         })
+}

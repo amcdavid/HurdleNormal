@@ -55,7 +55,8 @@ cgpaths <- function(y.zif, this.model, nlambda=100, lambda, lambda.min.ratio=if(
     ## kkt conditions
     kktout <- matrix(NA, nrow=length(lambda), ncol=p)
     ## diagnostic flags
-    flout <- matrix(NA, nrow=length(lambda), ncol=5)
+    flout <- matrix(NA, nrow=length(lambda), ncol=6)
+    colnames(flout) <- c('converged', 'round', 'geval', 'feval', 'gamma', 'nnz')
     colnames(out) <- parmap(p)
     rownames(kktout) <- rownames(flout) <- rownames(out) <- lambda
     jerr <- rep(0, length(lambda))
@@ -78,19 +79,21 @@ cgpaths <- function(y.zif, this.model, nlambda=100, lambda, lambda.min.ratio=if(
         theta <- out[l,] <- as.numeric(sp)
         kktout[l,] <- attr(sp, 'kkt')
         flout[l,] <- attr(sp, 'flag')
-        if(control$debug>0) message('Lambda = ', lambda[l], 'rounds = ', attr(sp, 'flag')['round'])
+        if(control$debug>0) message('Lambda = ', round(lambda[l], 3), ' rounds = ', attr(sp, 'flag')['round'])
         activeset <- sum(kktout[l,]>0)
         if(activeset >= n/2) break
         ## update jerr?
     }
-    list(path=out, kktout=kktout, flout=flout)
+    names(blocks) <- c("(Intercepts)", colnames(this.model))
+    list(path=out, kktout=kktout, flout=flout, blocks=blocks, lambda=lambda)
 }
 
 ## Get profile MLE (holding all else at 0)
 ## and find max block 2-norm of gradient
 getLambda0 <- function(theta, subll, sg, sg0, control, p, blocks){
     subtheta <- theta[blocks[[1]]]
-    o <- optim(subtheta, subll, sg, b=1, method='BFGS')
+    o <- optim(subtheta, subll, sg, b=1, method='BFGS', control=list(maxit=5e4))
+    if(o$convergence !=0) warning('Empty solution failed to converge')
     theta[blocks[[1]]] <- o$par
     subgrad <- sapply(2:p, function(b) sqrt(sum(sg0(b)^2)))
     list(lambda0=max(subgrad), theta0=theta)
@@ -238,11 +241,11 @@ solvePenProximal <- function(theta, lambda, control, p, blocks, subll, sg0, sg, 
         converged <- all(abs(kkt)<control$tol) || (round >= control$maxrounds)
         feval <- feval+p+1
         if(control$debug > 0){
-            if(control$debug>1 || (round %% 10)==0) print(noquote(paste0('penll=', round(LLall(thetaPrime1, penalize=TRUE), 5), ' theta= ', paste(round(thetaPrime1, 2), collapse=','), 'gamma= ', gamma )))
+            if(control$debug>1 && (round %% 10)==0) print(noquote(paste0('penll=', round(LLall(thetaPrime1, penalize=TRUE), 5), ' theta= ', paste(round(thetaPrime1, 2), collapse=','), 'gamma= ', gamma )))
         }
     } # end main loop
 
-    structure(ifelse(abs(theta)<control$tol, 0, theta), flag=c(converged=converged, round=round, geval=geval, feval=feval, gamma=gamma), kkt=kkt, debugval=debugval)        
+    structure(ifelse(abs(theta)<control$tol, 0, theta), flag=c(converged=converged, round=round, geval=geval, feval=feval, gamma=gamma, nnz=sum(kkt>0)-1), kkt=kkt, debugval=debugval)        
 }
 
 solvePen <- function(theta, lambda, control, p, blocks,  subll, sg, sg0, LLall, loc, scal){
@@ -286,5 +289,22 @@ solvePen <- function(theta, lambda, control, p, blocks,  subll, sg, sg0, LLall, 
     } # end main loop
 
         geval <- geval+p
-    structure(ifelse(abs(theta)<control$tol, 0, theta), flag=c(converged=converged, round=round, geval=geval, feval=feval, gamma=1), kkt=kkt)
+    structure(ifelse(abs(theta)<control$tol, 0, theta), flag=c(converged=converged, round=round, geval=geval, feval=feval, gamma=1, nnz=sum(kkt>0)-1), kkt=kkt)
+}
+
+plotSolPath <- function(cgpaths){
+    l2 <- sapply(cgpaths$blocks, function(b){
+        rowSums(cgpaths$path[,b]^2)
+    })
+    
+    l2[l2<=0] <- NA
+    l2 <- l2[,setdiff(colnames(l2), '(Intercepts)')]
+    mp <- within(reshape2::melt(l2), {
+    lambda <- as.numeric(X1)
+    X2 <- as.character(X2)
+})
+
+    pathPlot <- ggplot(mp, aes(x=lambda, y=value, col=X2))+geom_line() + scale_x_log10()
+    direct.label(pathPlot, 'last.points')
+    invisible(l2)
 }

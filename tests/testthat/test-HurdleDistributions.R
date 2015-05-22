@@ -103,3 +103,8 @@ test_that('Conditionals for Hlowdep', {
     Hupdep <- getGibbs(Hupdep)
     testshi <- adjustedCondDistr(Hupdep)    
 })
+
+test_that('Probabilities match', {
+    
+
+})
