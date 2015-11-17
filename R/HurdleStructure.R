@@ -63,6 +63,58 @@ getDensity <- function(hs, ...){
     function(x) with(hs$true, dHurdle210(x, G, H, K, ...))
 }
 
+
+
+##' Convert from old style to new style parameter vector or vice versa
+##' @param theta parameter vector
+##' @param unpack if TRUE convert from old style to new, else convert from new to old
+##' @return ordered parameter
+unpackTheta <- function(theta, method='unpack'){
+    p <- (length(theta)-3)/4+1
+    component <- c(rep(0, p), #gbb, gba
+                   rep(2, p), #hbb, hba
+                   rep(1, p-1),#hab
+                   rep(3, p-1),#kba
+                   4) #kbb
+    scaling <- c(1,   #gbb
+                 rep(2, p-1),           #gba
+                 rep(1, 2*p-1),             #hbb, hba, hab,
+                 rep(-1, p-1),              #kba
+                 1)                  #kbb
+    grporder <- order(component, coordmap(p))
+    method <- match.arg(method, c('unpack', 'pack', 'gradient'))
+    if(method=='unpack'){
+        return(theta[grporder]*scaling[grporder])
+    } else if(method=='pack') {
+        return(theta[order(grporder)]/scaling[order(grporder)])
+    } else if(method=='gradient'){
+        return(theta[order(grporder)]*scaling[order(grporder)]) #apply jacobian
+    }
+    
+}
+
+
+
+wrapHurdleLikelihood <- function(y, x, theta, lambda){
+    x <- cbind(1, abs(x)>0, x)
+    if(!missing(theta)){
+        theta <- unpackTheta(theta)
+        HurdleLikelihood(y, x, ,theta, lambda)
+    } else{
+           HurdleLikelihood(y, x, lambda=lambda)
+    }
+}
+
+wrapLLall <- function(hl, theta, penalize){
+    theta <- unpackTheta(theta)
+    hl$LLall(theta, penalize)
+}
+
+wrapGradAll <- function(hl, theta, penalize){
+    unpackTheta(hl$gradAll(unpackTheta(theta), penalize), 'gradient')
+}
+
+
 ##' Loop over indices and solve condiiton MLE
 ##'
 ##' @param hs HurdleStructure
@@ -79,16 +131,16 @@ getConditionalMLE <- function(hs,using='gibbs', testGrad=FALSE, engine='R', ...)
     for(j in 1:p){
         y <- samp[,j]
         x <- samp[,-j,drop=FALSE]
-        hl <- HurdleLikelihood(y, x, theta=parm[j,], lambda=0)
+        hl <- wrapHurdleLikelihood(y, x, theta=parm[j,], lambda=0)
         if(engine=='R'){
             ll <- generatelogLik(y, x, lambda=0)
             grad <- generatelogLik(y, x, lambda=0, returnGrad=TRUE)
         } else{
-            ll <- hl$LLall
-            grad <- hl$gradAll
+            ll <- function(x) wrapLLall(hl, theta=x, penalize=FALSE)
+            grad <- function(x) wrapGradAll(hl, theta=x, penalize=FALSE)
         }
         O <- try(hushWarning(optim(parm[j,], ll, method='BFGS', hessian=TRUE, ...), fixed('NaNs produced')))
-        if(inherits(O, 'try-error'))browser()
+        if(inherits(O, 'try-error'))
         if(testGrad && !all(abs(grad(O$par))<.1)){
             stop('Gradient not zero at putative solution.  Max |grad| =  ', max(abs(grad(O$par))))
         }

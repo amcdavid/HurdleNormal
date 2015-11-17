@@ -4,7 +4,7 @@
  *
  */
 
-#include <RcppArmadillo.h>
+
 
 class PenalizedLikelihood
 {

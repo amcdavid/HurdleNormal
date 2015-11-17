@@ -51,11 +51,10 @@ checkGrad <- function(hs, j=1, theta, lambda=0, engine='R'){
         gnum <- grad(glR, theta)
         ganalytic <- grR(theta)
 } else if(engine=='cpp'){
-    hl <- HurdleLikelihood(sample[,j], sample[,-j, drop=FALSE], theta=theta, lambda=lambda)
-    gnum <- grad(hl$LLall, theta)
-    ganalytic <- hl$gradAll(theta)
-    expect_equal(hl$LLall(theta), glR(theta), tolerance=1e-6, check.names=FALSE)
-    expect_equal(hl$gradAll(theta), grR(theta), tolerance=1e-6, check.names=FALSE)
+    hl <- wrapHurdleLikelihood(sample[,j], sample[,-j, drop=FALSE], theta=theta, lambda=lambda)
+    gnum <- grad(wrapLLall, x=theta, hl=hl,penalize=FALSE)
+    ganalytic <- wrapGradAll(hl, theta, penalize=FALSE)
+    expect_equal(wrapLLall(hl, theta, penalize=FALSE), glR(theta), tolerance=1e-6, check.names=FALSE)
 } else{
     stop('unreachable')
 }
