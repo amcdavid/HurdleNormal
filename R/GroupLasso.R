@@ -1,26 +1,77 @@
-defaultBix <- function(p){
-    seq(2, 2*p, by=2)
+nativeMap <- function(p){
+    covariates <- rep(seq(2, p), each=2)
+    block <- c(1,                       #intercept
+               covariates)
+    total <- c(block, block, 1) #kbb
+    total
 }
 
-makeModel <- function(zif, scale=TRUE, tol=.001){
+
+
+makeModel <- function(zif, ..., tol=.001){
     M <- cbind(zif, abs(zif)>tol)
     ord <- c(seq(2, ncol(zif)+1),seq(2, ncol(zif)+1))
     M <- M[,order(ord)]
-    M <- scale(M, scale=scale)
+    M <- scale(M, ...)
     cbind(1, M)
+}
+
+Block <- function(this.model, bidx, group='components', penalty.scale=NULL, bset){
+    ## only one of this.model, bidx and bset should be non-missing
+    ## group={components, none}
+    ## penalty scale should be provided as a list of indices and group={groups, components,none}
+
+    ## Always need groups -> parameters
+    ## parameters -> genes
+    ## groups -> penalties
+
+    group <- match.arg(group, c('components', 'none'))
+    if(!is.null(penalty.scale)){
+        if(!is.list(penalty.scale)) stop("`penalty.scale` should be list with components `scale` and `group`")
+        penalty.scale.group <- match.arg(penalty.scale$group, c('components', 'none', 'groups'))
+        if(!is.numeric(penalty.scale$scale)) stop("`penalty.scale$scale` should give integer indices into groups or parameters")
+        penalty.scale.scale <- penalty.scale$scale
+    }
+                       
+    if(!missing(this.model)){
+        p <- ncol(this.model)
+        nc <- (p+1)/2
+        bidxMM <- c(1, rep(2:nc, each=2))
+        map <- data.table(paridx=seq_len(2*p+1), block=c(bidxMM, bidxMM, 1), mmidx=c(1:p, 1:p, NA))
+        if(is.null(penalty.scale)){
+            penalty.map <- data.table(block=sort(unique(map$block)), lambda=c(0, rep(1, nc-1)))
+            penalty.scale.group <- 'groups'
+        }
+    }
+
+    if(penalty.scale.group=='groups'){
+        map <- merge(map, penalty.map, by='block')
+    } else if(penalty.scale.group=='components'){
+        stop('Not implemented')
+    } else{
+        penalty.map <- data.table(paridx=seq_along(penalty.scale.scale), lambda=penalty.scale.lambda)
+        map <- merge(map, penalty.map, by='paridx')
+    }
+
+    out <- list(map=map, nonpenpar=map[lambda<=0, paridx], nonpenMM=unique(map[lambda<=0 & !is.na(mmidx), mmidx]), nonpengrp=unique(map[lambda<=0, block]), lambdablock=map[,list(lambda=lambda[1]), keyby=block]$lambda)
+    class(out) <-  'Block'
+    out
 }
 
 ##' Get a solution path for the CG model
 ##'
-##' @param theta initial guess for parameter
 ##' @param y.zif (zero-inflated) response
-##' @param this.model (zero-inflated) covariates
+##' @param this.model model matrix used for both discrete and continuous linear predictors
+##' @param blocks object of Blocks giving blocking and block-specific penalization
+##' @param nlambda if `lambda` is not provided, then the number of lambda to interpolate between
+##' @param lambda.min.ratio if `lambda` is not provided, then the left end of the solution path as a function of the lambda0, the lambda for the empty model
 ##' @param lambda penalty path desired
 ##' @param control optimization control parameters
+##' @param theta (optional) initial guess for parameter
 ##' @return matrix of parameters, one row per lambda
 ##' @useDynLib HurdleNormal
 ##' @importFrom Rcpp sourceCpp
-cgpaths <- function(y.zif, this.model, nlambda=100, lambda, lambda.min.ratio=if(length(y.zif)<ncol(this.model)) .005 else .05, control=list(tol=1e-5, maxrounds=300, maxit=500, debug=1), standardize=FALSE, bidx=seq(2, ncol(this.model), by=2)){
+cgpaths <- function(y.zif, this.model, Blocks, nlambda=100, lambda.min.ratio=if(length(y.zif)<ncol(this.model)) .005 else .05, lambda, estimatePenaltyFactor=TRUE, control=list(tol=1e-5, maxrounds=300, maxit=500, debug=1), theta){
     defaultControl <- list(tol=1e-6, maxrounds=300, maxit=500, debug=0, method='proximal', stepcontract=.5, stepsize=3, stepexpand=.1, updatehess=floor(300*.66))
     nocontrol <- setdiff(names(defaultControl), names(control))
     control[nocontrol] <- defaultControl[nocontrol]
@@ -29,14 +80,10 @@ cgpaths <- function(y.zif, this.model, nlambda=100, lambda, lambda.min.ratio=if(
     n <- nrow(this.model)
     ## mapping from blocks to indices in theta.  block[1] gives unpenalized parameters.
 ## block[p] gives last group (so actually p-1 penalized groups)
-    bidx <- c(bidx, ncol(this.model)+1)
-    blocks <- lapply(seq_len(length(bidx)-1), function(i){
-        d <- seq(bidx[i], bidx[i+1]-1)
-        c(d, d+p)
-    })
+    blocks <- split(Blocks$map$paridx, Blocks$map$block)
                      
     ## start at 0 (except kbb=1)
-    theta <- c(rep(0, 2*p), 1)
+    if(missing(theta))     theta <- c(rep(0, 2*p), 1)
 
     ## get likelihood object
     ## ultimately calls C++ code in src/hurdle_likelihood.cpp
@@ -51,37 +98,15 @@ cgpaths <- function(y.zif, this.model, nlambda=100, lambda, lambda.min.ratio=if(
     ##     return(fun)
     ## }
     ## profile gradient
-    pen <- function(theta, lambda){
-        tot <- 0
-        for(b in seq_along(blocks)){
-            tot <- tot+lambda*sqrt(sum(theta[blocks[[b]]]^2))
-        }
-        tot
-    }
 
-    gradNorm <- function(gradEval, lambda){
-        tot <- rep(0, length(blocks))
-        for(b in seq_along(blocks)){
-            tot[b] <- sqrt(sum(gradEval[blocks[[b]]]^2))
+  
+    getsg <- function(th, penalize=FALSE){
+        fun <- function(th2, b){
+            th[blocks[[b]]] <- th2
+            hl$gradAll(th, penalize)[blocks[[b]]]
         }
-        tot
+        return(fun)
     }
-
-    thetaNorm <- function(theta, lambda){
-        tot <- rep(0, length(blocks))
-        for(b in seq_along(blocks)){
-            tot[b] <- sqrt(sum(theta[blocks[[b]]]^2))
-        }
-        tot
-    }
-        
-    ## getsg <- function(b, th, penalize=TRUE){
-    ##     fun <- function(th2){
-    ##         th[blocks[[b]]] <- th2
-    ##         hl$gradAll(th, penalize)[blocks[[b]]]
-    ##     }
-    ##     return(fun)
-    ## }
     
     ## ## use to test if gradient at 0 lies within lambda
     ## sg0 <- function(b){
@@ -96,21 +121,127 @@ cgpaths <- function(y.zif, this.model, nlambda=100, lambda, lambda.min.ratio=if(
     }
     
     ## value for empty sol
-    interceptCol <- setdiff(seq_len(p), seq(min(bidx), max(bidx)))
-    interceptPar <- c(interceptCol, interceptCol+p, length(theta))
+    interceptCol <- Blocks$nonpenMM
+    interceptPar <- Blocks$nonpenpar
     theta0 <- theta[interceptPar]
     hl0 <- HurdleLikelihood(y.zif, this.model[,interceptCol,drop=FALSE], theta=theta0, lambda=0)
     o <- optim(theta0, hl0$LLall, hl0$gradAll, penalize=FALSE, method='BFGS', control=list(maxit=5e4))
     if(o$convergence !=0) warning('Empty solution failed to converge')
     theta[interceptPar] <- o$par
-    l0 <- max(gradNorm(hl$gradAll(theta)))
-    
+
+    if(estimatePenaltyFactor){
+        sg <- getsg(theta)
+        hess <- blockHessian(theta, sg, blocks, onlyActive=FALSE, control, fuzz=.1)
+        np <- solve(hess[[Blocks$nonpengrp]])*min(eigen(hess[[Blocks$nonpengrp]])$values)
+                                        #hess <- lapply(blocks, function(x) diag(length(x)))
+        setkey(Blocks$map, block)
+        sqrthess <- penMat <- hess
+        for(b in seq_along(blocks)){
+            this.lambda <- unique(Blocks$map[block==b, lambda])
+            ##hess[[b]] <- hess[[b]]+diag(1, nrow(hess[[b]]))
+            ## Diagonalize
+            hb <- matrix(0, nrow=nrow(hess[[b]]), ncol=ncol(hess[[b]]))
+            diag(hb) <- diag(hess[[b]])
+            ##hess[[b]] <- diag(1, nrow(hess[[b]]))
+            ##hess[[b]] <- hb
+            sqrthess[[b]] <- chol(hess[[b]])*this.lambda
+            ## End Diagonalize
+            if(this.lambda>0){
+                penMat[[b]] <-  solve(hess[[b]])/this.lambda^2
+            } else{
+                penMat[[b]] <- diag(1, nrow=nrow(hess[[b]]))
+            }
+            hess[[b]] <- hess[[b]]*this.lambda^2  #switcheroo
+        }
+    }
+
+    ## Returns proximal subtheta
+    ## proxfun <- function(b, theta, gamma, lambda){
+    ##     subtheta <- theta[blocks[[b]]]
+    ##     if(Blocks$lambdablock[b]<=0){
+    ##         return(subtheta)
+    ##     } else {
+    ##         trans <- solve(sqrthess[[b]])
+    ##         subthetaTrans <- subtheta %*% trans
+    ##         ## ##tnorm <- sqrt(crossprod(subtheta, penMat[[b]]) %*% subtheta)
+    ##         tnorm <- sqrt(sum(subthetaTrans^2))
+    ##         #browser(expr=contract>0)
+    ##         if(tnorm>gamma*lambda){
+    ##             sstheta <- sum(subtheta^2)
+    ##             dpen <- diag(penMat[[b]])
+    ##             ellfun <- function(rho) sstheta* sum(rho*dpen/(1+rho*dpen)) - rho*gamma^2*lambda^2
+    ##             rho <- optimize(ellfun, c(0, 1000), maximum=TRUE)$maximum
+                
+    ##             proj <- diag(1/((1+rho*dpen)*lambda))
+    ##             res <- t(proj %*% subtheta)
+    ##             print(paste0("lambda*gamma: ", lambda*gamma, ",norm: ", sqrt(sum((res %*% trans)^2))))
+    ##             return(subtheta-res)
+    ##         } else{
+    ##             return(subtheta * 0)
+    ##         }
+    ##     }
+    ## }
+
+        ## Returns proximal subtheta
+    proxfun <- function(b, theta, gamma, lambda){
+        subtheta <- theta[blocks[[b]]]
+        if(Blocks$lambdablock[b]<=0){
+            return(subtheta)
+        } else {
+            trans <- solve(sqrthess[[b]])
+            subthetaTrans <- subtheta %*% trans
+            ## ##tnorm <- sqrt(crossprod(subtheta, penMat[[b]]) %*% subtheta)
+            tnorm <- sqrt(sum(subthetaTrans^2))
+            #browser(expr=contract>0)
+            if(tnorm>gamma*lambda){
+                obj <- function(x) sum((x-subtheta)^2)/(2*gamma) + lambda*sqrt(crossprod(x, hess[[b]])%*%x)
+                gr <- function(x) (x-subtheta)/gamma + lambda*as.vector(crossprod(x, hess[[b]]))/sqrt(crossprod(x, hess[[b]])%*%x)
+                oo <- optim(subtheta, obj, gr, method='BFGS')
+                res <- oo$par
+                return(res)
+            } else{
+                return(subtheta * 0)
+            }
+        }
+    }
+
+
+    ## Returns kkt divergence
+    kktfun <- function(b, theta, nonpengrad, lambda, flagBad0=TRUE){
+        sgrad <- nonpengrad[blocks[[b]]]
+        if(Blocks$lambdablock[b]<=0){
+            return(sqrt(sum(sgrad^2)))
+        } else{
+            subtheta <- theta[blocks[[b]]]
+            tnorm <- sqrt(crossprod(subtheta, hess[[b]]) %*% subtheta)
+            if(tnorm > 0){
+                pgrad <- sgrad + lambda * as.vector(hess[[b]] %*% subtheta)/tnorm
+                #browser()
+                return(sqrt(sum(pgrad^2)))
+            } else{
+                psubgrad <- sqrt(crossprod(sgrad, penMat[[b]]) %*% sgrad)
+                if(psubgrad <lambda){
+                    return(0)
+                } else if(flagBad0){
+                    return(-99L)
+                } else{
+                    return(psubgrad)
+                }
+            }
+        }
+    }
+
+    ## estimate lambda0 given penalty
+    ## return penalty matrix and kkt function (how related??)
+    gr <- hl$gradAll(theta)
+    l0block <- sapply(seq_along(blocks), kktfun, theta=theta, nonpengrad=hl$gradAll(theta), lambda=0, flagBad0=FALSE)
+    l0 <- max(l0block)
     if(l0<0) stop('Negative lambda0 should not happen')
     if(missing(lambda)) lambda <- 10^seq(log10(1.05*l0), log10(l0*lambda.min.ratio), length.out=nlambda)
     ## solution path
     out <- matrix(NA, nrow=length(lambda), ncol=length(theta))
     ## kkt conditions
-    kktout <- matrix(NA, nrow=length(lambda), ncol=length(blocks)+1)
+    kktout <- matrix(NA, nrow=length(lambda), ncol=length(blocks))
     ## diagnostic flags
     flout <- matrix(NA, nrow=length(lambda), ncol=6)
     colnames(flout) <- c('converged', 'round', 'geval', 'feval', 'gamma', 'nnz')
@@ -119,18 +250,15 @@ cgpaths <- function(y.zif, this.model, nlambda=100, lambda, lambda.min.ratio=if(
     jerr <- rep(0, length(lambda))
 
     message('grad block1 ', paste(hl0$gradAll(theta[interceptPar]), collapse=','))
-    ## if(control$updatehess){
-    ##     blockHessian(theta, sg, blocks, onlyActive=FALSE, control)
-    ## }
-
+    
 
     ## loop over lambda
     for(l in seq_along(lambda)){
         hl$setLambda(lambda[l])
         if(method=='block'){
-            sp <-solvePen(theta, lambda[l], control, p, blocks, subll, sg, sg0, LLall)
+            sp <-solvePen(theta, lambda[l], control, p, Blocks, subll, sg, sg0, LLall)
         } else{ #proximal
-            sp <- solvePenProximal(theta, lambda[l], control, blocks, LLall, gradAll, thetaNorm, pen, gamma)#, pre, ihess1, gamma)
+            sp <- solvePenProximal(theta, lambda[l], control, Blocks, LLall, gradAll, proxfun, kktfun, pre0=np, hess, gamma)
             gamma <- as.numeric(attr(sp, 'flag')['gamma'])
         }
         theta <- out[l,] <- as.numeric(sp)
@@ -141,49 +269,43 @@ cgpaths <- function(y.zif, this.model, nlambda=100, lambda, lambda.min.ratio=if(
         if(activeset >= n/2) break
         ## update jerr?
     }
-    names(blocks) <- c("(Intercepts)", colnames(this.model))
+    blocks <- c(interceptCol, blocks)
+    names(blocks) <- c("(Intercepts)", paste0('B', seq(2, length(blocks))))
     list(path=out, kktout=kktout, flout=flout, blocks=blocks, lambda=lambda)
 }
 
 
-## blockHessian <- function(theta, sg, blocks, onlyActive=TRUE, control, fuzz=.1, pre){
-##     message('Update hessian')
-##     frame <- sys.frame(-1)
-##     hess1 <- numDeriv::jacobian(sg, theta[blocks[[1]]], b=1, penalize=FALSE)
-##     hess1 <- hess1+diag(nrow(hess1))*fuzz
-##     sg(1, theta[blocks[[1]]], penalize=FALSE)
-##     bsize <- length(blocks[[2]])
-##     hess <- array(0, c(bsize, bsize, length(blocks)))
-##     null <- rep(TRUE, length(blocks))
-##     if(missing(pre)){
-##         pre <- rep(1/max(diag(hess1)), length(blocks))
-##     }
-##     for(b in seq(2, length(blocks))){
-##         subtheta <- theta[blocks[[b]]]
-##         if(!onlyActive || sum(subtheta^2)>control$tol){
-##             hess[,,b] <- numDeriv::jacobian(sg, subtheta, b=b, penalize=FALSE)
-##             sg(b=b, subtheta, penalize=FALSE)
-##             null[b] <- FALSE
-##             pre[b] <- 1/max(diag(hess[,,b]), fuzz)
-##         } else{
-##             hess[,,b] <- diag(bsize)*fuzz
-##         }
-##     }
-##     if(any(!null)){
-##         hess[,,null] <- rowMeans(hess[,,!null], 2)
-##     }
-##     assign('ihess1', solve(hess1), frame)
-##     assign('pre', pre, frame)
-## }
+## need to minimize 1/2 * tcrossprod(y %*% Linv) - p%*%y, subject to crossprod(y) <= 1
+## Pope https://tcg.mae.cornell.edu/pubs/Pope_FDA_08.pdf page 14
+
+blockHessian <- function(theta, sg, blocks, onlyActive=TRUE, control, fuzz=.1, pre){
+    message('Update hessian')
+    hess <- vector('list', length(blocks))
+    for(b in seq_along(blocks)){
+        hess[[b]] <- numDeriv::jacobian(sg, theta[blocks[[b]]], b=b)
+        hess[[b]] <- hess[[b]]+diag(nrow(hess[[b]]))*fuzz
+    }
+    hess
+}
+
+project <- function(x, K){
+    sqrtK <- t(chol(K))
+    sqrtKinv <- solve(sqrtK)
+    lenx <- sqrt(sum(crossprod(sqrtK, x)^2))
+    print(lenx)
+    if(lenx<1) return(x) else return(x/lenx)
+
+}
+
 
 ## Solve the penalized function using proximal gradient descent
-solvePenProximal <- function(theta, lambda, control, blocks, LLall, gradAll, thetaNorm, pen, gamma){
+solvePenProximal <- function(theta, lambda, control, Blocks, LLall, gradAll, proxfun, kktfun,pre0, hess, gamma){
     feval <- geval <- 0
     ## total number of rounds
     round <- 0
     ## amount of consecutive successful (non-line search) prox's we've done
     step <- 1
-    p <- length(blocks)
+    p <- length(theta)
     converged <- FALSE
     kkt <- Inf
     ## thetaPrime0 is previous iteration, thetaPrime1 is current and theta is proximal proposed point
@@ -193,7 +315,7 @@ solvePenProximal <- function(theta, lambda, control, blocks, LLall, gradAll, the
     if(gamma<=0)     gamma <- control$stepsize
     thisll <- LLall(theta, penalize=FALSE)
     gr <- gradAll(thetaPrime1, penalize=FALSE)
-    nonPen <- setdiff(seq_along(theta), unlist(blocks))
+    blocks <- split(Blocks$map$paridx, Blocks$map$block)
     ## preconditioner
     ## stopifnot(all(pre[2:p]>0))
     if(control$debug>2){
@@ -214,22 +336,19 @@ solvePenProximal <- function(theta, lambda, control, blocks, LLall, gradAll, the
         ## thetaPrime[blocks[[1]]] <- O$par
         ## thisll <- LLall(thetaPrime, penalize=FALSE)        
         ## update intercept
-        #theta[blocks[[1]]] <- thetaPrime1[blocks[[1]]] - gamma*crossprod(ihess1, gr[blocks[[1]]])
-        #qapprox <- crossprod(theta[blocks[[1]]]-thetaPrime1[blocks[[1]]], hess1) %*% (theta[blocks[[1]]]-thetaPrime1[blocks[[1]]])
-        ##message('grad=', paste(round(gr,2), collapse=','), '\ntheta=', paste(round(theta,2), collapse=','))
+                                        #theta[blocks[[1]]] <- thetaPrime1[blocks[[1]]] - gamma*crossprod(ihess1, gr[blocks[[1]]])
+                                        #qapprox <- crossprod(theta[blocks[[1]]]-thetaPrime1[blocks[[1]]], hess1) %*% (theta[blocks[[1]]]-thetaPrime1[blocks[[1]]])
+                                        ##message('grad=', paste(round(gr,2), collapse=','), '\ntheta=', paste(round(theta,2), collapse=','))
         geval <- geval+length(blocks)
-        theta <- thetaPrime1-gamma*gr
-        tNorm <- thetaNorm(theta, lambda)
-        for(b in seq_len(p)){ ##project block onto group lasso penalty
-            contract <- (1-lambda*gamma/tNorm[[b]])
-            if(contract < 0){ # is 0 the minimum?
-                theta[blocks[[b]]] <- 0
-                if(control$debug>3) print(noquote(paste0('Zeroed block ', b, ', |subtheta|_2 = ', tNorm[[b]])))
-            } else{ #otherwise, just contract a bit
-                theta[blocks[[b]]] <- theta[blocks[[b]]]*contract
-            }
-            #qapprox <- qapprox+sum((theta[blocks[[b]]]-subtheta)^2/pre[b])
-        } # end blockupdates
+        np <- blocks[[Blocks$nonpengrp]]
+         theta[np] <- thetaPrime1[np]-tcrossprod(gamma*gr[np], pre0)
+         theta[-np] <- thetaPrime1[-np]-gamma*gr[-np]
+        ##theta <- thetaPrime1-gamma*gr
+
+        #theta <- thetaPrime1-gamma*gr
+        for(b in seq_along(blocks)){ ##project block onto group lasso penalty
+            theta[blocks[[b]]] <- proxfun(b, theta, gamma, lambda)
+        }
 
         newll <- LLall(theta, penalize=FALSE)
         boydCondition1 <- thisll +crossprod(gr, theta-thetaPrime1)+ sum((thetaPrime1-theta)^2) /(2* gamma)
@@ -255,45 +374,42 @@ solvePenProximal <- function(theta, lambda, control, blocks, LLall, gradAll, the
             thisll <- newll
             step <- step+1
             if(step>4){
-                #try increasing stepsize by shrinking towards control$stepsize
+                                        #try increasing stepsize by shrinking towards control$stepsize
                 gamma <- gamma*(1-control$stepexpand)+control$stepsize*control$stepexpand
             }
 
             ##update gradient (no need if we haven't moved thetaPrime1)
             gr <- gradAll(thetaPrime1, penalize=FALSE)
-            kkt <- sapply(seq_len(p), function(b){
-                subtheta <- theta[blocks[[b]]]
-                if(all(abs(subtheta)<control['tol'])){
-                    if(sqrt(sum(gr[blocks[[b]]]^2))<lambda) return(0L) else return(-99L)
-                }
-                else{
-                    pen <- lambda*subtheta/sqrt(sum(subtheta^2))
-                    sg1 <- gr[blocks[[b]]]+pen
-                    return(sum(sg1^2))
-                }
-            })
-            kkt <- c(sum(gr[nonPen]^2), kkt)
+            kkt <- sapply(seq_along(blocks), kktfun, theta=thetaPrime1, nonpengrad=gr, lambda=lambda, flagBad0=TRUE)
 
-        ## try updating hessian
-        ## if(control$updatehess > 0 & (round %% control$updatehess)==0)  blockHessian(theta, sg, blocks, onlyActive=TRUE, control, pre=pre)
-        
-        ## message('kkt=', paste(round(kkt,2), collapse=','))
-        if(control$debug>2){
-#            debugval$pre[round,] <- pre
-            debugval$kkt[round,] <- kkt
-            debugval$theta[round,] <- thetaPrime1
-            debugval$gamma[round] <- gamma
+                ## try updating hessian
+                ## if(control$updatehess > 0 & (round %% control$updatehess)==0)  blockHessian(theta, sg, blocks, onlyActive=TRUE, control, pre=pre)
+                
+                ## message('kkt=', paste(round(kkt,2), collapse=','))
+                if(control$debug>2){
+                                        #            debugval$pre[round,] <- pre
+                    debugval$kkt[round,] <- kkt
+                    debugval$theta[round,] <- thetaPrime1
+                    debugval$gamma[round] <- gamma
+                }
+                converged <- all(abs(kkt)<control$tol)
+                feval <- feval+p+1
+                if(control$debug > 0){
+                    if(control$debug>1 && (round %% 10)==0 || control$debug>2){
+                        pen <- sapply(1:length(blocks), function(b){
+                            st <- theta[blocks[[b]]]
+                            lambda*sqrt(crossprod(st, hess[[b]]) %*% st)
+                        })
+                        print(noquote(paste0('penll=', round(LLall(thetaPrime1, penalize=FALSE) + sum(pen), 5), ' theta= ', paste(round(thetaPrime1, 2), collapse=','), 'gamma= ', sprintf('%2.2e', gamma))))
+                        debugval$thisll[round] <- LLall(thetaPrime1, FALSE)+sum(pen)
+                    }
+                }
         }
-        converged <- all(abs(kkt)<control$tol) || (round >= control$maxrounds)
-        feval <- feval+p+1
-        if(control$debug > 0){
-            if(control$debug>1 && (round %% 10)==0) print(noquote(paste0('penll=', round(LLall(thetaPrime1, penalize=FALSE) + pen(thetaPrime1, lambda) , 5), ' theta= ', paste(round(thetaPrime1, 2), collapse=','), 'gamma= ', gamma )))
-        }
-        }
+        converged <- converged || (round >= control$maxrounds)
     } # end main loop
 
-    structure(ifelse(abs(theta)<control$tol, 0, theta), flag=c(converged=converged, round=round, geval=geval, feval=feval, gamma=gamma, nnz=sum(kkt>0)-1), kkt=kkt, debugval=debugval)        
-}
+        structure(ifelse(abs(theta)<control$tol, 0, theta), flag=c(converged=converged, round=round, geval=geval, feval=feval, gamma=gamma, nnz=sum(kkt>0)-1), kkt=kkt, debugval=debugval)        
+    }
 
 solvePen <- function(theta, lambda, control, p, blocks,  subll, sg, sg0, LLall, loc, scal){
     feval <- geval <- 0
