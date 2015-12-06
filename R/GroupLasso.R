@@ -58,6 +58,28 @@ Block <- function(this.model, bidx, group='components', penalty.scale=NULL, bset
     out
 }
 
+## Let K^{-1} = A^T A = U^T D U
+## Solve
+## argmin_x ||y-A^T x||^2 + lambda * ||x||
+## Then translate back to get solution of
+## argmin_x ||y-x||^2 + lambda||A^{-T} x||
+projectEllipse <- function(v, lambda, d, u, control){
+    r_solve_thresh <- 1e-9
+    max_r_iters <- 400
+    r=0
+    error_r=sum(v^2/(d*r+lambda)^2)-1
+    r_iter=0
+    while(abs(error_r)>=r_solve_thresh && r_iter<max_r_iters){
+        r_iter=r_iter+1
+        if(r_iter==max_r_iters){ warning("Linesearch iteration exceeded") }
+        slope=2*sum(v^2*d/(d*r+lambda)^3)
+        r=error_r/slope+r
+        error_r=sum(v^2/(d*r+lambda)^2)-1
+    } # end while(error_r>=...) i.e. we have solved for r
+    ##return(u%*%diag(r/(d*r+lambda))%*%v)
+    return(u %*% diag(sqrt(d)) %*%diag(r/(d*r+lambda))%*%v)
+}
+
 ##' Get a solution path for the CG model
 ##'
 ##' @param y.zif (zero-inflated) response
@@ -71,7 +93,7 @@ Block <- function(this.model, bidx, group='components', penalty.scale=NULL, bset
 ##' @return matrix of parameters, one row per lambda
 ##' @useDynLib HurdleNormal
 ##' @importFrom Rcpp sourceCpp
-cgpaths <- function(y.zif, this.model, Blocks, nlambda=100, lambda.min.ratio=if(length(y.zif)<ncol(this.model)) .005 else .05, lambda, estimatePenaltyFactor=TRUE, control=list(tol=1e-5, maxrounds=300, maxit=500, debug=1), theta){
+cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nlambda=100, lambda.min.ratio=if(length(y.zif)<ncol(this.model)) .005 else .05, lambda, penaltyFactor='full', control=list(tol=1e-5, maxrounds=300, maxit=500, debug=1), theta){
     defaultControl <- list(tol=1e-6, maxrounds=300, maxit=500, debug=0, method='proximal', stepcontract=.5, stepsize=3, stepexpand=.1, updatehess=floor(300*.66))
     nocontrol <- setdiff(names(defaultControl), names(control))
     control[nocontrol] <- defaultControl[nocontrol]
@@ -129,75 +151,56 @@ cgpaths <- function(y.zif, this.model, Blocks, nlambda=100, lambda.min.ratio=if(
     if(o$convergence !=0) warning('Empty solution failed to converge')
     theta[interceptPar] <- o$par
 
-    if(estimatePenaltyFactor){
-        sg <- getsg(theta)
-        hess <- blockHessian(theta, sg, blocks, onlyActive=FALSE, control, fuzz=.1)
-        np <- solve(hess[[Blocks$nonpengrp]])*min(eigen(hess[[Blocks$nonpengrp]])$values)
-                                        #hess <- lapply(blocks, function(x) diag(length(x)))
-        setkey(Blocks$map, block)
-        sqrthess <- penMat <- hess
-        for(b in seq_along(blocks)){
-            this.lambda <- unique(Blocks$map[block==b, lambda])
-            ##hess[[b]] <- hess[[b]]+diag(1, nrow(hess[[b]]))
-            ## Diagonalize
-            hb <- matrix(0, nrow=nrow(hess[[b]]), ncol=ncol(hess[[b]]))
-            diag(hb) <- diag(hess[[b]])
-            ##hess[[b]] <- diag(1, nrow(hess[[b]]))
-            ##hess[[b]] <- hb
-            sqrthess[[b]] <- chol(hess[[b]])*this.lambda
-            ## End Diagonalize
-            if(this.lambda>0){
-                penMat[[b]] <-  solve(hess[[b]])/this.lambda^2
-            } else{
-                penMat[[b]] <- diag(1, nrow=nrow(hess[[b]]))
-            }
-            hess[[b]] <- hess[[b]]*this.lambda^2  #switcheroo
+    sg <- getsg(theta)
+    hess <- blockHessian(theta, sg, blocks, onlyActive=FALSE, control, fuzz=.1)
+    np <- solve(hess[[Blocks$nonpengrp]])*min(eigen(hess[[Blocks$nonpengrp]])$values)
+    sqrtPen <- eigval <- eigvec <- penMat <- hess
+    for(b in seq_along(blocks)){
+        this.lambda <- Blocks$lambdablock[b]
+        ##hess[[b]] <- hess[[b]]+diag(1, nrow(hess[[b]]))
+        ## Diagonalize
+        hb <- matrix(0, nrow=nrow(hess[[b]]), ncol=ncol(hess[[b]]))
+        diag(hb) <- diag(hess[[b]])
+        if(penaltyFactor=='identity'){
+            hess[[b]] <- diag(1, nrow(hess[[b]]))
+        } else if(penaltyFactor=='diagonal'){
+            hess[[b]] <- hb
         }
+        
+        ## End Diagonalize
+        if(this.lambda>0){
+            penMat[[b]] <-  solve(hess[[b]])/this.lambda^2
+        } else{
+            penMat[[b]] <- diag(1, nrow=nrow(hess[[b]]))
+        }
+        hess[[b]] <- hess[[b]]*this.lambda^2  #switcheroo
+        eig <- eigen(penMat[[b]])
+        eigval[[b]] <- eig$values
+        eigvec[[b]] <- eig$vectors
+        sqrtPen[[b]] <- eig$vectors %*% sqrt(diag(eig$values)) %*% t(eig$vectors)
     }
-
-    ## Returns proximal subtheta
-    ## proxfun <- function(b, theta, gamma, lambda){
-    ##     subtheta <- theta[blocks[[b]]]
-    ##     if(Blocks$lambdablock[b]<=0){
-    ##         return(subtheta)
-    ##     } else {
-    ##         trans <- solve(sqrthess[[b]])
-    ##         subthetaTrans <- subtheta %*% trans
-    ##         ## ##tnorm <- sqrt(crossprod(subtheta, penMat[[b]]) %*% subtheta)
-    ##         tnorm <- sqrt(sum(subthetaTrans^2))
-    ##         #browser(expr=contract>0)
-    ##         if(tnorm>gamma*lambda){
-    ##             sstheta <- sum(subtheta^2)
-    ##             dpen <- diag(penMat[[b]])
-    ##             ellfun <- function(rho) sstheta* sum(rho*dpen/(1+rho*dpen)) - rho*gamma^2*lambda^2
-    ##             rho <- optimize(ellfun, c(0, 1000), maximum=TRUE)$maximum
-                
-    ##             proj <- diag(1/((1+rho*dpen)*lambda))
-    ##             res <- t(proj %*% subtheta)
-    ##             print(paste0("lambda*gamma: ", lambda*gamma, ",norm: ", sqrt(sum((res %*% trans)^2))))
-    ##             return(subtheta-res)
-    ##         } else{
-    ##             return(subtheta * 0)
-    ##         }
-    ##     }
-    ## }
 
         ## Returns proximal subtheta
     proxfun <- function(b, theta, gamma, lambda){
         subtheta <- theta[blocks[[b]]]
-        if(Blocks$lambdablock[b]<=0){
+        if(Blocks$lambdablock[b]<=0 || lambda <=0){
             return(subtheta)
         } else {
-            trans <- solve(sqrthess[[b]])
-            subthetaTrans <- subtheta %*% trans
-            ## ##tnorm <- sqrt(crossprod(subtheta, penMat[[b]]) %*% subtheta)
-            tnorm <- sqrt(sum(subthetaTrans^2))
-            #browser(expr=contract>0)
+            u <- eigvec[[b]]
+            d <- eigval[[b]]
+            pm <- penMat[[b]]
+            ## chl <- chol(penMat[[b]])
+            sqrtPen <- sqrtPen[[b]]
+            v <- (t(u) %*% sqrtPen %*% subtheta)
+            tnorm <- sqrt(sum(v^2))
+            stopifnot(sum(abs(tnorm - sqrt(crossprod(subtheta, pm) %*% subtheta)))<1e-7)
             if(tnorm>gamma*lambda){
-                obj <- function(x) sum((x-subtheta)^2)/(2*gamma) + lambda*sqrt(crossprod(x, hess[[b]])%*%x)
-                gr <- function(x) (x-subtheta)/gamma + lambda*as.vector(crossprod(x, hess[[b]]))/sqrt(crossprod(x, hess[[b]])%*%x)
-                oo <- optim(subtheta, obj, gr, method='BFGS')
-                res <- oo$par
+                ## obj <- function(x) sum((x-subtheta)^2)/2 + gamma*lambda*sqrt(crossprod(x, hess[[b]])%*%x)
+                ## gr <- function(x) (x-subtheta) + gamma*lambda*as.vector(crossprod(x, hess[[b]]))/sqrt(crossprod(x, hess[[b]])%*%x)
+
+                ## oo <- optim(subtheta, obj, gr, method='BFGS')
+                res <- projectEllipse(v, gamma*lambda, d, u)
+                ## stopifnot(all(solve(chl, oo2$par)==oo$par))
                 return(res)
             } else{
                 return(subtheta * 0)
@@ -288,15 +291,6 @@ blockHessian <- function(theta, sg, blocks, onlyActive=TRUE, control, fuzz=.1, p
     hess
 }
 
-project <- function(x, K){
-    sqrtK <- t(chol(K))
-    sqrtKinv <- solve(sqrtK)
-    lenx <- sqrt(sum(crossprod(sqrtK, x)^2))
-    print(lenx)
-    if(lenx<1) return(x) else return(x/lenx)
-
-}
-
 
 ## Solve the penalized function using proximal gradient descent
 solvePenProximal <- function(theta, lambda, control, Blocks, LLall, gradAll, proxfun, kktfun,pre0, hess, gamma){
@@ -340,13 +334,12 @@ solvePenProximal <- function(theta, lambda, control, Blocks, LLall, gradAll, pro
                                         #qapprox <- crossprod(theta[blocks[[1]]]-thetaPrime1[blocks[[1]]], hess1) %*% (theta[blocks[[1]]]-thetaPrime1[blocks[[1]]])
                                         ##message('grad=', paste(round(gr,2), collapse=','), '\ntheta=', paste(round(theta,2), collapse=','))
         geval <- geval+length(blocks)
-        np <- blocks[[Blocks$nonpengrp]]
-         theta[np] <- thetaPrime1[np]-tcrossprod(gamma*gr[np], pre0)
-         theta[-np] <- thetaPrime1[-np]-gamma*gr[-np]
-        ##theta <- thetaPrime1-gamma*gr
-
-        #theta <- thetaPrime1-gamma*gr
-        for(b in seq_along(blocks)){ ##project block onto group lasso penalty
+        ## np <- blocks[[Blocks$nonpengrp]]
+        ##  theta[np] <- thetaPrime1[np]-tcrossprod(gamma*gr[np], pre0)
+        ##  theta[-np] <- thetaPrime1[-np]-gamma*gr[-np]
+        theta <- thetaPrime1-gamma*gr
+        
+        for(b in seq_along(blocks)){ ##project block onto group lasso penalt
             theta[blocks[[b]]] <- proxfun(b, theta, gamma, lambda)
         }
 
@@ -380,7 +373,7 @@ solvePenProximal <- function(theta, lambda, control, Blocks, LLall, gradAll, pro
 
             ##update gradient (no need if we haven't moved thetaPrime1)
             gr <- gradAll(thetaPrime1, penalize=FALSE)
-            kkt <- sapply(seq_along(blocks), kktfun, theta=thetaPrime1, nonpengrad=gr, lambda=lambda, flagBad0=TRUE)
+            kkt <- vapply(seq_along(blocks), kktfun, NA_real_, theta=thetaPrime1, nonpengrad=gr, lambda=lambda, flagBad0=TRUE)
 
                 ## try updating hessian
                 ## if(control$updatehess > 0 & (round %% control$updatehess)==0)  blockHessian(theta, sg, blocks, onlyActive=TRUE, control, pre=pre)

@@ -22,7 +22,7 @@ test_that('Can fit', {
     names(theta) <- parmap(3)
     lambda <- c(2.8, 1, .8, .7, .6, .5, .3, .1, .1, .05, .05, .01, 0)
 
-    paths1 <- cgpaths(y.zif, this.model, Block(this.model), lambda=lambda, control=list(tol=1e-3, maxrounds=400, debug=1, method='proximal', stepsize=1, updatehess=200, stepexpand=.05))
+    paths1 <- cgpaths(y.zif, this.model, Block(this.model), lambda=lambda, control=list(tol=1e-3, maxrounds=400, debug=1, method='proximal', stepsize=1, updatehess=200, stepexpand=.05), penaltyFactor='full')
     #paths2 <- cgpaths(y.zif, makeModel(rgh[,-1, drop=FALSE]), lambda=lambda, control=list(tol=1e-5, maxrounds=2000, debug=0, method='block'), standardize=FALSE)
     hm <- HurdleLikelihood(y.zif, this.model, theta=paths1$path[13,], lambda=0)
     thetareg <- optim(paths1$path[13,], hm$LLall, hm$gradAll, method='L-BFGS-B', hessian=TRUE, control=list(pgtol=1-8, maxit=1e4))

@@ -11,12 +11,12 @@ autoLogistic <- function(samp){
     })
 }
 
-fitHurdle <- function(samp, nlambda=100, control=list(tol=1e-5, maxrounds=3000, maxit=1000, debug=0, method='proximal', updatehess=2500, stepsize=3), lambda.min.ratio=.1, makeModelArgs=NULL, parallel=TRUE){
+fitHurdle <- function(samp, nlambda=100, control=list(tol=1e-3, maxrounds=3000, maxit=200, debug=0, method='proximal', updatehess=2500, stepsize=1), lambda.min.ratio=.1, makeModelArgs=NULL, parallel=TRUE, ...){
     applyfun <- if(parallel) mclapply else lapply
     applyfun(seq_len(ncol(samp)), function(i){
         message('i=', i)
         mm <- do.call(makeModel, c(list(samp[,-i]), makeModelArgs))
-        cgpaths(samp[,i], mm, nlambda=nlambda, control=control, lambda.min.ratio=.1)
+        cgpaths(samp[,i], mm, Blocks=Block(mm), nlambda=nlambda, control=control, lambda.min.ratio=.1, ...)
     })
 }
 
