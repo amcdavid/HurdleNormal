@@ -246,27 +246,27 @@ simulateHurdle210 <- function(N, p, dependence='G', structure='independence', st
         HS
     }
     hs <- HurdleStructure(G, H, K, gibbs=FALSE)
-    hs <- tweakOffDiag(hs, lH0, lG0)
 
     if(!is.null(tweak)){
-    jamPcor <- function(lH=lH0, lG=lG0){
-        message('**lH= ', round(lH, 2), 'lG = ', round(lG, 2), '**')
-        hs <- tweakOffDiag(hs, lH, lG)
-        rho <- as.matrix(pcor.shrink(hs$gibbs, lambda=.15))
-        diag(rho) <- 0
-        obj <- sum( (2*anynz-1)*abs(rho))
-        message('--obj=', obj, '--')
-        obj
+        hs <- tweakOffDiag(hs, lH0, lG0)
+        jamPcor <- function(lH=lH0, lG=lG0){
+            message('**lH= ', round(lH, 2), 'lG = ', round(lG, 2), '**')
+            hs <- tweakOffDiag(hs, lH, lG)
+            rho <- as.matrix(pcor.shrink(hs$gibbs, lambda=.15))
+            diag(rho) <- 0
+            obj <- sum( (2*anynz-1)*abs(rho))
+            message('--obj=', obj, '--')
+            obj
+        }
+        O2 <- optimize(jamPcor, c(-2, lH0+3), tol=.15, lG=lG0)
+        lH0 <- O2$min
+        if(tweak=='GH'){
+            O <- optimize(jamPcor, c(-lG0-1, lG0), tol=.15, lH=lG0)
+            lG0 <- O$min
+        }
+        message('lH=', lH0, 'lG= ', lG0)
+        hs <- tweakOffDiag(hs, lH0, lG0)
     }
-    O2 <- optimize(jamPcor, c(-2, lH0+3), tol=.15, lG=lG0)
-    lH0 <- O2$min
-    if(tweak=='GH'){
-        O <- optimize(jamPcor, c(-lG0-1, lG0), tol=.15, lH=lG0)
-        lG0 <- O$min
-    }
-    message('lH=', lH0, 'lG= ', lG0)
-}
-    hs <- tweakOffDiag(hs, lH0, lG0)
     hs <- getGibbs(hs, N/.1+2000, burnin=2000, thin=.1)
     margins <- colMeans(abs(hs$gibbs)>0)
     message(paste(margins, collapse=','))
