@@ -16,7 +16,7 @@ Imports:
     RcppArmadillo,
     numDeriv,
     nloptr,
-    ggplot2,
+    ggplot2(>= 2.0.0),
     reshape,
     data.table,
     proto
