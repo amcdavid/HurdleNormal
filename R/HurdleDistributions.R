@@ -34,6 +34,7 @@ dHurdle210 <- function(x, G, H, K, tol=5e-2){
 ##' @param tol passed to fun
 ##' @return list of: reimann-weighted function on the grid/lattice (feval) and
 ##' breaks (lattice points)
+##' @rdname eval_grid_hurdle_measure
 .evalGridHurdleMeasure <- function(lower, upper, dx, fun, ..., tol=5e-2){
     dxli <- limitli <- vector('list', length=length(lower))
     for(i in seq_along(lower)){

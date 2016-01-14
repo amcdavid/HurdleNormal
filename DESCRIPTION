@@ -1,9 +1,12 @@
 Package: HurdleNormal
-Title: 'Estimation and sampling for multi-dimensional Hurdle models on a Normal density'
-Version: 0.0.2
+Title: 'Estimation and sampling for multi-dimensional Hurdle models on a Normal density with applications to single-cell co-expression'
+Version: 0.2
 Authors@R: person("Andrew", "McDavid", , "andrew.n.mcdavid@gmail.com", role = c("aut", "cre"))
-Description: A Hurdle model is a modification of a distribution at zero.  This package provides routines to estimate and sample from multivariate Hurdle models on a Normal density.
-Depends: R (>= 3.1.2)
+Description: A Hurdle model is a modification of a distribution at zero. This
+    package provides routines to estimate and sample from multivariate Hurdle models
+    on a Normal density. These are distributions that are conditionally Normal, but with singularities along the coordinate axes, so generalize a univariate zero-inflated distribution.  The main functionality is to estimate graphical models using group-lasso penalized neighborhood selection.
+Depends:
+    R (>= 3.1.2)
 License: GPL-3
 LazyData: true
 Imports:
@@ -20,5 +23,5 @@ Imports:
 Suggests:
     testthat
 LinkingTo: RcppArmadillo,
-	   Rcpp
-
+    Rcpp
+RoxygenNote: 5.0.1

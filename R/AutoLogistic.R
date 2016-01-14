@@ -1,4 +1,5 @@
 ##' @export
+##' @import reshape
 ##' @import glmnet
 ##' @import data.table
 autoLogistic <- function(samp){

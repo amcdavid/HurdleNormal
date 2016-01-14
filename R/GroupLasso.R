@@ -11,7 +11,7 @@ nativeMap <- function(p){
 
 ##' Generate a design matrix corresponding to the 2-1-0 hurdle
 ##'
-##' .. content for \details{} ..
+##' details
 ##' @param zif zero-inflated covariates
 ##' @param ... arguments passed to `scale`
 ##' @param tol tolerance for declaring a parameter equal to zero
@@ -28,7 +28,7 @@ makeModel <- function(zif, ..., tol=.001){
 
 ##' Generate a design matrix corresponding to the 2-1-0 hurdle
 ##'
-##' .. content for \details{} ..
+##' details
 ##' @param zif zero-inflated covariates
 ##' @param ... arguments passed to `scale`
 ##' @param tol tolerance for declaring a parameter equal to zero
@@ -65,6 +65,7 @@ makeModelOrthog <- function(zif, ..., tol=.001){
 ##' @param penalty.scale \code{numeric} of length bidx/bset
 ##' @param bset NOT IMPLEMENTED
 ##' @return a list containing a data.table `map` giving the mapping between parameters, groups and penalty scales and some other components
+##' @export
 Block <- function(this.model, bidx, group='components', penalty.scale=NULL, bset){
     ## only one of this.model, bidx and bset should be non-missing
     ## group={components, none}
@@ -146,6 +147,7 @@ projectEllipse <- function(v, lambda, d, u, control){
 ##' @return matrix of parameters, one row per lambda
 ##' @useDynLib HurdleNormal
 ##' @importFrom Rcpp sourceCpp
+##' @export
 cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nlambda=100, lambda.min.ratio=if(length(y.zif)<ncol(this.model)) .005 else .05, lambda, penaltyFactor='full', control=list(tol=1e-3, maxrounds=300, debug=1), theta){
     defaultControl <- list(tol=1e-3, maxrounds=300, debug=1, stepcontract=.5, stepsize=1, stepexpand=.1)
     nocontrol <- setdiff(names(defaultControl), names(control))

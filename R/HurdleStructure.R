@@ -121,7 +121,6 @@ wrapGradAll <- function(hl, theta, penalize){
 ##' @param using 'gibbs' or 'sample'
 ##' @param ... passed to optim
 ##' @return list of length two giving parameter values and standard errors. j is the index of the response, i is the index of the coefficient.
-##' @import reshape
 ##' @export
 getConditionalMLE <- function(hs,using='gibbs', testGrad=FALSE, engine='R', ...){
     samp <-  if(using=='gibbs') hs$gibbs else hs$sample
