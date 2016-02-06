@@ -8,7 +8,7 @@
 
 class HurdleLikelihood {
  private:
-  static const int large=30;
+  static const double large=30;
  public:
   arma::vec y, yI; 			// response
   arma::mat xd;//, xc;			// design matrix, assumed to be in group order
@@ -42,7 +42,7 @@ class HurdleLikelihood {
   double LL(bool penalize);
   arma::vec grad(const arma::vec& th, bool penalize);
   arma::vec grad(bool penalize);
-  arma::mat hessian(const arma::vec& th, int grp);
+  //arma::mat hessian(const arma::vec& th, int grp);
   void setLambda(const arma::vec& lambda_);
   static arma::uvec::fixed<7> parmap(int k_);
 

@@ -4,12 +4,20 @@
 \alias{makeModel}
 \title{Generate a design matrix corresponding to the 2-1-0 hurdle}
 \usage{
-makeModel(zif, ..., tol = 0.001)
+makeModel(zif, Fixed = matrix(1, nrow = nrow(zif), ncol = 1), center = TRUE,
+  scale = TRUE, conditionalCenter = FALSE, ..., tol = 0.001)
 }
 \arguments{
 \item{zif}{zero-inflated covariates}
 
-\item{...}{arguments passed to `scale`}
+\item{center}{center design matrix}
+
+\item{scale}{scale design matrix}
+
+\item{conditionalCenter}{in positive predictors, center only the non-zero components
+(design matrix will still be centered, and orthogonal to indicators)}
+
+\item{...}{ignored}
 
 \item{tol}{tolerance for declaring a parameter equal to zero}
 }

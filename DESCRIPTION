@@ -19,9 +19,10 @@ Imports:
     ggplot2(>= 2.0.0),
     reshape,
     data.table,
-    proto
+    Matrix
 Suggests:
-    testthat
+    testthat,
+    parallel
 LinkingTo: RcppArmadillo,
     Rcpp
 RoxygenNote: 5.0.1
