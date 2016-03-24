@@ -103,10 +103,13 @@ void HurdleLikelihood::setLambda(const vec& lambda_){
   lambda = lambda_;
 }
 
-arma::mat HurdleLikelihood::hessian(const arma::vec& th, int grp){
-  arma::mat22 a(fill::zeros);
-  return(a);
-}
+// arma::mat HurdleLikelihood::hessian(const arma::ivec& idx){
+//   arma::vec tmp = exp(gplusc);
+//   cumulant3= 1/tmp;
+//   cumulant3.elem(small) = tmp.elem(small)/square(1+tmp.elem(small));
+//   x * w
+
+// }
 
 // map from parameters into starting indices of theta
 arma::uvec::fixed<7> HurdleLikelihood::parmap(int k_) {
@@ -193,6 +196,13 @@ RcppExport SEXP HurdleLikelihood__gradAll(SEXP xp, SEXP th_, SEXP penalize_) {
   return wrap(res);
 }
 
+RcppExport SEXP HurdleLikelihood__gradAllFixed(SEXP xp, SEXP penalize_) {
+  Rcpp::XPtr<HurdleLikelihood> ptr(xp);
+  bool penalize = as<bool>(penalize_);
+  arma::vec res = ptr->grad(penalize);
+  return wrap(res);
+}
+
 RcppExport SEXP HurdleLikelihood__setLambda(SEXP xp, SEXP lambda_){
   // grab the object as a XPtr (smart pointer)
   Rcpp::XPtr<HurdleLikelihood> ptr(xp);
@@ -207,9 +217,19 @@ RcppExport SEXP HurdleLikelihood__gpart(SEXP xp) {
   return wrap(ptr->gpart);
 }
 
+RcppExport SEXP HurdleLikelihood__hpart(SEXP xp) {
+  Rcpp::XPtr<HurdleLikelihood> ptr(xp);
+  return wrap(ptr->hpart);
+}
+
 RcppExport SEXP HurdleLikelihood__cumulant(SEXP xp) {
   Rcpp::XPtr<HurdleLikelihood> ptr(xp);
   return wrap(ptr->cumulant);
+}
+
+RcppExport SEXP HurdleLikelihood__cumulant2(SEXP xp) {
+  Rcpp::XPtr<HurdleLikelihood> ptr(xp);
+  return wrap(ptr->cumulant2);
 }
 
 RcppExport SEXP HurdleLikelihood__gplusc(SEXP xp) {
