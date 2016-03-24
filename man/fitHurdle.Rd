@@ -5,26 +5,30 @@
 \alias{fitHurdle}
 \title{Fit the hurdle model coordinate-by-coordinate on a sample}
 \usage{
-autoLogistic(samp, fixed = NULL, nlambda = 200, lambda.min.ratio = 0.1)
+autoLogistic(samp, fixed = NULL, nlambda = 200, lambda.min.ratio = 0.1,
+  parallel = FALSE)
 
-fitHurdle(samp, nlambda = 100, control = list(tol = 0.001, maxrounds = 3000,
-  debug = 0, stepsize = 1), lambda.min.ratio = 0.1, makeModelArgs = NULL,
-  parallel = TRUE, checkpoint_dir = NULL, ...)
+fitHurdle(samp, parallel = TRUE, checkpoint_dir = NULL,
+  makeModelArgs = NULL, returnNodePaths = FALSE, indices, ...)
 }
 \arguments{
 \item{samp}{matrix of data, columns are variables}
 
-\item{nlambda}{How many points to fit in the path}
+\item{fixed}{unpenalized covariates to include.  NOT IMPLEMENTED for autoLogistic yet.}
 
-\item{lambda.min.ratio}{minimum lambda as a fraction of lambda0}
+\item{nlambda}{number of knots in solution path}
 
-\item{control}{arguments passed to cgpaths}
-
-\item{makeModelArgs}{arguments passed to the model matrix function}
+\item{lambda.min.ratio}{minimum lambda as function lambda0, the smallest lambda such that all coordinates are zero}
 
 \item{parallel}{parallelize over variables using "mclapply"?}
 
 \item{checkpoint_dir}{(optional) directory to save the fit of each gene, useful for large problems.  If it exists, then completed genes will be automatically loaded.}
+
+\item{makeModelArgs}{(optional) arguments passed to the model matrix function}
+
+\item{returnNodePaths}{return node-wise output (solution paths and diagnostics for each node) as attribute `nodePaths`}
+
+\item{indices}{(optional) subset of indices to fit, useful for cluster parallelization.  NOT IMPLEMENTED.}
 
 \item{...}{passed to cgpaths}
 }
