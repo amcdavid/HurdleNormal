@@ -1,9 +1,11 @@
 ##' @export
 ##' @import reshape
-##' @import glmnet
 ##' @import data.table
 ##' @import Matrix
 ##' @describeIn fitHurdle Fit an auto-logistic (Ising) model to \code{samp} using glmnet
+##' @param fixed unpenalized covariates to include.  NOT IMPLEMENTED for autoLogistic yet.
+##' @param nlambda number of knots in solution path
+##' @param lambda.min.ratio minimum lambda as function lambda0, the smallest lambda such that all coordinates are zero
 autoLogistic <- function(samp, fixed=NULL, nlambda=200, lambda.min.ratio=.1, parallel=FALSE){
     samp0 <- (abs(samp)>0)*1
      applyfun <- if(parallel) function(X, FUN) parallel::mclapply(X, FUN, mc.preschedule=TRUE) else lapply
@@ -14,7 +16,7 @@ autoLogistic <- function(samp, fixed=NULL, nlambda=200, lambda.min.ratio=.1, par
 
         posobs <- sum(samp0[,i])
         if( posobs > 2 && (nrow(samp0)-posobs)>2){
-            net <- glmnet(model, samp0[,i], family='binomial',lambda.min.ratio=lambda.min.ratio, nlambda=nlambda, penalty.factor=penalty.factor)
+            net <- glmnet::glmnet(model, samp0[,i], family='binomial',lambda.min.ratio=lambda.min.ratio, nlambda=nlambda, penalty.factor=penalty.factor)
             path <- Matrix::t(coef(net))
         } else{
             net <- list(df=c(1), lambda=c(0))
@@ -32,15 +34,13 @@ autoLogistic <- function(samp, fixed=NULL, nlambda=200, lambda.min.ratio=.1, par
 ##' @param samp matrix of data, columns are variables
 ##' @param parallel parallelize over variables using "mclapply"?
 ##' @param checkpoint_dir (optional) directory to save the fit of each gene, useful for large problems.  If it exists, then completed genes will be automatically loaded.
-##' @param makeModelArgs arguments passed to the model matrix function
+##' @param makeModelArgs (optional) arguments passed to the model matrix function
 ##' @param returnNodePaths return node-wise output (solution paths and diagnostics for each node) as attribute `nodePaths`
+##' @param indices (optional) subset of indices to fit, useful for cluster parallelization.  NOT IMPLEMENTED.
 ##' @param ... passed to cgpaths
-##' @param nlambda How many points to fit in the path
-##' @param control arguments passed to cgpaths
-##' @param lambda.min.ratio minimum lambda as a fraction of lambda0
 ##' @return list of fits, one per coordinate and an attribute "timing"
 ##' @export
-fitHurdle <- function(samp, parallel=TRUE, checkpoint_dir=NULL, makeModelArgs, returnNodePaths=FALSE, ...){
+fitHurdle <- function(samp, parallel=TRUE, checkpoint_dir=NULL, makeModelArgs=NULL, returnNodePaths=FALSE, indices, ...){
     applyfun <- if(parallel) function(X, FUN) parallel::mclapply(X, FUN, mc.preschedule=FALSE) else lapply
     timing <- system.time(result <- applyfun(seq_len(ncol(samp)), function(i){
         message('i=', i)
