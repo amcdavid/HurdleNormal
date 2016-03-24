@@ -198,13 +198,15 @@ simulateHurdle210 <- function(N, p, dependence='G', structure='independence', st
         ## empty matrix to be filled with dependences and added to diagonal matrix
         depMat <- matrix(0, p, p)
         ## get a offdiagonal location and fill with a nonzero entry (using intensityArgs)
+        offdiag <- p*(p-1)/2
+        nnz <- ceiling(structureArgs$sparsity*offdiag)
         if(structure=='sparse'){
-            offdiag <- p*(p-1)/2
-            nnz <- ceiling(structureArgs$sparsity*offdiag)
             depidx <- if(nnz>1) sample(offdiag, nnz) else 1 #let's use the 1,2 entry unless we need more than one dependence
             depMat[upper.tri(depMat)][depidx] <- intensityArgs[[d]]*sign(intensityArgs[['gamma']]-runif(length(depidx)))
         } else if(structure=='chain'){
-            depidx <- cbind(i=seq_len(p-1), j=2:p)
+            i <- rep(seq_len(p), length.out=nnz)
+            depidx <- cbind(i=i, j=(i+ceiling(seq_len(nnz)/p)))
+            depidx[depidx[,'j']>p, 'j'] <- 1
             depMat[depidx] <- intensityArgs[[d]]
         }
         ## else independence, and we just add an empty matrix.
@@ -212,6 +214,9 @@ simulateHurdle210 <- function(N, p, dependence='G', structure='independence', st
         assign(d, ourMat)
     }
     K <- K+t(K)
+    eK <- min(eigen(K, only.values=TRUE)$values-.1, 0)
+    diag(K) <- diag(K)-diag(K)*eK #Let's keep it PD folks
+    
     H <- Hupper + t(Hlower)
     G <- G+t(G)
     diag(G) <- Gdiag
@@ -245,7 +250,6 @@ simulateHurdle210 <- function(N, p, dependence='G', structure='independence', st
         HS
     }
     hs <- HurdleStructure(G, H, K, gibbs=FALSE)
-
     if(!is.null(tweak)){
         hs <- tweakOffDiag(hs, lH0, lG0)
         jamPcor <- function(lH=lH0, lG=lG0){
