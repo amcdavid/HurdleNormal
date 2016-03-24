@@ -7,7 +7,7 @@
 Block(this.model, bidx, group = "components", penalty.scale = NULL, bset)
 }
 \arguments{
-\item{this.model}{(optional) a matrix created by}
+\item{this.model}{(optional) a matrix created by \code{\link{makeModel}}}
 
 \item{bidx}{NOT IMPLEMENTED starting index of each group}
 
