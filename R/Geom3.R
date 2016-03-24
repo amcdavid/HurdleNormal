@@ -1,89 +1,50 @@
-##' Plot conditional regression line and conditional means
-##'
-##' Details
-##' @param mapping 
-##' @param data 
-##' @param stat 
-##' @param position 
-##' @param na.rm 
-##' @param anno.colors 
-##' @param tol 
-##' @param ... 
-##' @return plot
-##' @import proto
-##' @export
-geom_hurdle <- function(mapping = NULL, data = NULL, stat = "identity", position = "identity", na.rm=FALSE, show.legent=NA, inherit.aes=TRUE, anno.colors=c('blue', 'red'), tol = .01, ...) {
-  GeomHurdle$new(mapping = mapping, data = data, stat=stat, position = position, na.rm=FALSE, anno.colors=anno.colors, tol = tol, ...)
-
+stat_hurdle2d <- function(mapping = NULL, data = NULL, geom = "line",
+                       position = "identity", na.rm = FALSE, show.legend = NA, 
+                       inherit.aes = TRUE,tol=.01, ...) {
   layer(
-    data = data,
-    mapping = mapping,
-    stat = stat,
-    geom = GeomHurdle,
-    position = position,
-    show.legend = show.legend,
-    inherit.aes = inherit.aes,
-    params = list(
-      na.rm = na.rm,
-      anno.colors=anno.colors,
-      tol=tol,
-      ...
-    )
+    stat = StatHurdle2d, data = data, mapping = mapping, geom = geom, 
+    position = position, show.legend = show.legend, inherit.aes = inherit.aes,
+    params = list(na.rm = na.rm, tol=tol, ...)
   )
 }
 
-GeomHurdle <- ggplot2::ggproto("GeomHurdle", ggplot2::GeomPoint, 
-  required_aes = c("x", "y"),
-  non_missing_aes = c("linetype", "size", "shape"),
-  default_aes = ggplot2::aes(colour = "black", size = 0.5, linetype = 1, alpha = NA),
-  draw_panel = function(data, panel_scales, coord, anno.colors=c('blue', 'red'), tol=.01){
-      c2d <- calc_hurdle2d(data, tol=tol, color=anno.colors[1])
-      cx <- calc_hurdle1d(data, 'x', tol, color=anno.colors[2])
-      cy <- calc_hurdle1d(data, 'y', tol, color=anno.colors[2])
-      cy <- cbind(x=-.2, xstart=-.2, xend=.2, cy)
-      cx <- cbind(y=-.2, ystart=-.2, yend=.2, cx)
-      GeomPoint$draw_panel(data, panel_scales, coord)
-      GeomSegment$draw_panel(cx, panel_scales, coord)
-      GeomSegment$draw_panel(cy, panel_scales, coord)
-      GeomLine$draw_panel(c2d, panel_scales, coord)
-      # ggname(.$my_name(), grobTree(
-      #     .super$draw(., data, ...),
-      #     GeomLine$draw(c2d, ...),
-      #     GeomSegment$draw(cx, ...),
-      #     GeomSegment$draw(cy, ...)
-      #    ))
-  }
-
-  
-)
-
-calc_hurdle2d <- function(data, vars=c('x', 'y'), tol, color){
+StatHurdle2d <- ggplot2::ggproto('StatHurdle2d', ggplot2::Stat, compute_group=function(data, scales, tol){
+vars=c('x', 'y')
     dv <- data[,vars,drop=FALSE]
     zero <- rowSums(abs(dv)<tol)>0
     data <- data[!zero,]
     Yprime <- lm(y ~ x, data=data)$fitted
     data[,'y'] <- Yprime
-    data[,'colour'] <- color
-    data[,'linetype'] <- 1
-    data[,'size'] <- 1
     data
-}
+})
 
-# calculate the mean of a variable (x,y) and return a data frame with a segment centered at zero at that mean
-calc_hurdle1d <- function(data, vars, tol, color){
-    maybevars <- c('x', 'y')
-    othervar <- setdiff(maybevars, vars)
-    dv <- data[,vars,drop=FALSE]
-    notdv <- data[1,setdiff(names(data), c(maybevars, 'colour'))]
-    good <- abs(data[,vars])>tol & abs(data[,othervar])<tol
-    m <- mean(dv[good,vars])
-    s2 <- mad(dv[good,vars])/sqrt(sum(good))
-    #ms2 <- data.frame(x=0, ystart=m-1.96*s2, y=m, ymax=m+1.96*s2)
-    ms2 <- data.frame(y=m, ystart=m, yend=m)
-    names(ms2) <- str_replace_all(names(ms2), '^y', vars)
-#    names(ms2)[1] <-  othervar
-    notdv[,'size'] <- 1
-    data.frame(notdv, ms2, colour=color)#, linetype=1)
+StatHurdle1d <- ggplot2::ggproto("StatHurdle1d", ggplot2::Stat,
+                        compute_group = function(data, scales, vars, tol){
+                            maybevars <- c('x', 'y')
+                            othervar <- setdiff(maybevars, vars)
+                            dv <- data[,vars,drop=FALSE]
+                            notdv <- data[1,setdiff(names(data), maybevars)]
+                            good <- abs(data[,vars])>tol & abs(data[,othervar])<tol
+                            m <- mean(dv[good,vars])
+                            s2 <- mad(dv[good,vars])/sqrt(sum(good))
+                            segloc <- data.frame(y=m, yend=m)
+                            names(segloc) <- str_replace_all(names(segloc), '^y', vars)
+                            segfix <- data.frame(x=-.2, xend=.2)
+                            names(segfix) <- str_replace_all(names(segfix), '^x', othervar)
+                            data.frame(segfix, segloc, notdv)#, linetype=1)
+                        },
+                        required_aes = c("x", "y")
+                        )
+
+
+stat_hurdle1d <- function(mapping = NULL, data = NULL, geom = "segment",
+                       position = "identity", na.rm = FALSE, show.legend = NA, 
+                       inherit.aes = TRUE,vars='x', tol=.01, ...) {
+  layer(
+    stat = StatHurdle1d, data = data, mapping = mapping, geom = geom, 
+    position = position, show.legend = show.legend, inherit.aes = inherit.aes,
+    params = list(na.rm = na.rm, vars=vars, tol=tol, ...)
+  )
 }
 
 ##' Wrapper so ggally can use \code{geom_hurdle}
@@ -94,11 +55,11 @@ calc_hurdle1d <- function(data, vars, tol, color){
 ##' @param ... 
 ##' @return plot
 ##' @export
-ggally_hurdle <- function(data, mapping, ...){
-                      p <- ggplot(data, mapping)+geom_hurdle(...)
-                      p$type <- 'continuous'
-                      p$subType <- 'hurdle'
-                      p
+ggally_hurdle <- function(data, mapping, lwd.regression=1, lwd.axis=2, size.point=1, ...){
+    p <- ggplot(data, mapping)+geom_point(size=size.point, ...)+stat_hurdle1d(vars='x', lwd=lwd.axis, color='red', ...)+stat_hurdle1d(vars='y', lwd=lwd.axis, color='red', ...)+stat_hurdle2d(lwd=lwd.regression, color='blue', ...)
+    p$type <- 'continuous'
+    p$subType <- 'hurdle'
+    p
                   }
 
 ggally_hmosaic <- function(data, mapping, ...){
