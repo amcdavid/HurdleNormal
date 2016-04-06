@@ -11,17 +11,18 @@ nativeMap <- function(p){
 
 ##' Generate a design matrix corresponding to the 2-1-0 hurdle
 ##'
-##' details
 ##' @param zif zero-inflated covariates
+##' @param nodeId names to be used for nodes.  `colnames` of `zif` will be used if provided.
+##' @param Fixed optional matrix of fixed predictors
 ##' @param center center design matrix
 ##' @param scale scale design matrix
 ##' @param conditionalCenter in positive predictors, center only the non-zero components
 ##' (design matrix will still be centered, and orthogonal to indicators)
-##' @param tol tolerance for declaring a parameter equal to zero
 ##' @param ... ignored
-##' @return design matrix
+##' @param tol tolerance for declaring a parameter equal to zero
+##' @return design matrix, with attribute fixedCols giving indices of unpenalized intercept columns
 ##' @export
-makeModel <- function(zif, Fixed=matrix(1, nrow=nrow(zif), ncol=1), center=TRUE, scale=TRUE, conditionalCenter=FALSE, ..., tol=.001){
+makeModel <- function(zif, nodeId, Fixed=matrix(1, nrow=nrow(zif), ncol=1), center=TRUE, scale=FALSE, conditionalCenter=TRUE, ..., tol=.001){
     nonZ <- abs(zif)>tol
     if(conditionalCenter){
         for(i in seq_len(ncol(zif))){
@@ -41,7 +42,13 @@ makeModel <- function(zif, Fixed=matrix(1, nrow=nrow(zif), ncol=1), center=TRUE,
     M <- M[,order(ord)]
     M <- scale(M, center=center, scale=scale)
     MM <- cbind(Fixed, M)
-    structure(MM, fixedCols=seq_len(ncol(Fixed)))
+    if(missing(nodeId)){
+        nodeId <- colnames(zif)
+    }
+    if(length(nodeId) != ncol(zif)){
+        stop('Length of `nodeId` must match `ncols(zif)`')
+    }
+    structure(MM, fixedCols=seq_len(ncol(Fixed)), nodeId=nodeId)
 }
 
 
@@ -49,26 +56,35 @@ makeModel <- function(zif, Fixed=matrix(1, nrow=nrow(zif), ncol=1), center=TRUE,
 ##' Define parameter groups
 ##'
 ##' Define parameter groups and relative penalization.
-##' Only one of \code{this.model}, \code{bidx} or \code{bset} should be provided.
-##' When \code{this.model} is provided, it is assumed to have been created by with \code{makeModel},
-##' and the first column is assumed to be an unpenalized intercept, followed by pairs of interaction terms.
+##' If \code{this.model} is specified, then, neither \code{blist} nor \code{nlist} should be provided.
+##' If \code{this.model} is not specified then both of the preceeding must be provided.
+##' When \code{this.model} is provided, it is assumed to have been created by with \code{makeModel}.
+##'  Column indices indicated in the attribute `fixedCols` are unpenalized intercepts, then followed by pairs of interaction terms.
 ##' The grouping corresponds to the parameter set for a node.
 ##' Otherwise, only one of bidx or bset should be set, but this is not implemented yet.
+##' @details
+##' There are four components that all need to be mapped between each other.
+##' In increasing abstraction, with variable prefixes in parenthesis:
+##' 1. (p)arameter vector. The map is given in these terms. 
+##' 2. (mm) model matrix--columns from the covariate matrix.
+##' 3. (b)locks -- penalty groups
+##' 4. (n)odes. -- the graph-theoretic structure.
+##' 5. lambda -- penalties as a function of blocks.
+##' All of these components are provided in the `map`
 ##' @param this.model (optional) a matrix created by \code{\link{makeModel}}
-##' @param bidx NOT IMPLEMENTED starting index of each group
+##' @param blist a list of parameter indices, one per block.  By default the first block is assumed to be unpenalized.
+##' @param mlist a list of parameter indices, one per column of the model.matrix. If omitted, assumed to equal to the identity.
+##' @param nlist a named list of block indices, one per node
 ##' @param group \code{character}: one of components, or none.
-##' @param penalty.scale \code{numeric} of length bidx/bset
-##' @param bset NOT IMPLEMENTED
+##' @param penalty.scale optional list containing elements `scale` and `group`.
+##' `group` should be one of 'block' or 'none'.  `scale` should be \code{numeric} of length `blist` or the sum of the `blist` lengths.
 ##' @return a list containing a data.table `map` giving the mapping between parameters, groups and penalty scales and some other components
 ##' @export
-Block <- function(this.model, bidx, group='components', penalty.scale=NULL, bset){
+Block <- function(this.model, blist, mlist, nlist, lambda, group='components', penalty.scale=NULL){
     ## only one of this.model, bidx and bset should be non-missing
     ## group={components, none}
     ## penalty scale should be provided as a list of indices and group={groups, components,none}
 
-    ## Always need groups -> parameters
-    ## parameters -> genes
-    ## groups -> penalties
 
     group <- match.arg(group, c('components', 'none'))
     if(!is.null(penalty.scale)){
@@ -77,30 +93,54 @@ Block <- function(this.model, bidx, group='components', penalty.scale=NULL, bset
         if(!is.numeric(penalty.scale$scale)) stop("`penalty.scale$scale` should give integer indices into groups or parameters")
         penalty.scale.scale <- penalty.scale$scale
     }
+    ## this.model provided
     if(!missing(this.model)){
         nfixed <- length(attr(this.model, 'fixedCols'))
+        nodeId <- c('(Fixed)', attr(this.model, 'nodeId'))
+
+        ## used to assign nodeIds and blocks when group=='components'
         p <- ncol(this.model)
+        nc <- (p-nfixed)/2 #penalized blocks
+        ## block index into model matrix
+        bidxMM <- c(rep(1, nfixed), (rep(1:nc, each=2)
+                        +1)) #offset from non-pen block
+        ## node index into parameter vector
+        nidxPar <- c(bidxMM, bidxMM, 1) #variance
+
+        ## group lasso
         if(group=='components'){
-            ## group lasso
-            nc <- (p-nfixed)/2 #penalized blocks
-            bidxMM <- c(rep(1, nfixed), (rep(1:nc, each=2)
-                                         +1)) #offset from non-pen block
-            block <- c(bidxMM, bidxMM, 1) #variance
+            ## block index into parameter
+            bidxPar <- nidxPar
+            ## node -> block map
         } else{
             nc <- (p-nfixed)               #regular lasso
             bidxMM <- c(rep(1, nfixed), ((1:nc)+1))
             bidxMM2 <- c(rep(1, nfixed), ((1:nc)+nc+1))
-            block <- c(bidxMM, bidxMM2, 1)
+            bidxPar <- c(bidxMM, bidxMM2, 1)
         }
-        map <- data.table(paridx=seq_len(2*p+1), block=block, mmidx=c(1:length(bidxMM), 1:length(bidxMM), NA))
-        if(is.null(penalty.scale)){
-            penalty.map <- data.table(block=sort(unique(map$block)), lambda=c(0, rep(1, length(unique(block))-1)))
-            penalty.scale.group <- 'groups'
-        }
-    } else{
-        stop("Not implemented")
+        nodeMap <- data.table(nodeId, nidx=seq_along(nodeId))
+        map <- data.table(paridx=seq_len(2*p+1), block=bidxPar, mmidx=c(1:length(bidxMM), 1:length(bidxMM), NA), nidx=nidxPar)
+        map <- merge(map, nodeMap, by='nidx')
     }
-
+    ## end this.model provided
+    else{
+        bvec <- data.table(paridx=unlist(blist), block=rep(seq_along(blist), times=sapply(blist, length)))
+        if(is.list(nlist)){
+            nvec <- setNames(reshape2:::melt.list(nlist), c('block', 'nodeId'))
+        } else{
+            nvec <- data.table(block=seq_along(nlist), nodeId=nlist)
+        }
+        if(missing(mlist)) mlist <- as.list(bvec$paridx)
+        mvec <- data.table(paridx=unlist(mlist), mmidx=rep(seq_along(mlist), times=sapply(mlist, length)))
+        map <- merge(bvec, nvec, by='block')
+        map <- merge(map, mvec, by='paridx')        
+    }
+    
+    if(is.null(penalty.scale)){
+        blocks <- sort(unique(map$block))
+        penalty.map <- data.table(block=blocks, lambda=c(0, rep(1, length(blocks)-1)))
+        penalty.scale.group <- 'groups'
+    }    
     if(penalty.scale.group=='groups'){
         map <- merge(map, penalty.map, by='block')
     } else if(penalty.scale.group=='components'){
@@ -110,6 +150,7 @@ Block <- function(this.model, bidx, group='components', penalty.scale=NULL, bset
         map <- merge(map, penalty.map, by='paridx')
     }
 
+    setkey(map, paridx)
     out <- list(map=map, nonpenpar=map[lambda<=0, paridx], nonpenMM=unique(map[lambda<=0 & !is.na(mmidx), mmidx]), nonpengrp=unique(map[lambda<=0, block]), lambdablock=map[,list(lambda=lambda[1]), keyby=block]$lambda)
     class(out) <-  'Block'
     out
@@ -154,7 +195,7 @@ projectEllipse <- function(v, lambda, d, u, control){
 ##' @useDynLib HurdleNormal
 ##' @importFrom Rcpp sourceCpp
 ##' @export
-cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nlambda=100, lambda.min.ratio=if(length(y.zif)<ncol(this.model)) .005 else .05, lambda, penaltyFactor='full', control=list(tol=1e-3, maxrounds=300, debug=1), theta){
+cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_character_, nlambda=100, lambda.min.ratio=if(length(y.zif)<ncol(this.model)) .005 else .05, lambda, penaltyFactor='full', control=list(tol=1e-3, maxrounds=300, debug=1), theta){
     defaultControl <- list(tol=1e-3, maxrounds=300, debug=1, stepcontract=.5, stepsize=1, stepexpand=.1, FISTA=FALSE, newton0=FALSE)
     nocontrol <- setdiff(names(defaultControl), names(control))
     control[nocontrol] <- defaultControl[nocontrol]
@@ -183,7 +224,7 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nlambda=100, la
         colnames(flout) <- c('converged', 'round', 'geval', 'feval', 'gamma', 'nnz')
         colnames(out) <- c(outer(1:p, c('D', 'C'),paste0), 'kbb')
         rownames(kktout) <- rownames(flout) <- rownames(out) <- lambda
-        return(list(path=out, kktout=kktout, flout=flout, blocks=Blocks, lambda=lambda))
+        return(list(path=out, kktout=kktout, flout=flout, blocks=Blocks, lambda=lambda, nodeId=nodeId))
 }
 
     ## get likelihood object
@@ -326,8 +367,8 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nlambda=100, la
     colnames(flout) <- c('converged', 'round', 'geval', 'feval', 'gamma', 'nnz')
     colnames(out) <- c(outer(1:p, c('D', 'C'),paste0), 'kbb')
     rownames(kktout) <- rownames(flout) <- rownames(out) <- lambda
-    
-    message('grad block1 ', paste(hl0$gradAll(theta[interceptPar]), collapse=','))
+
+    if(control$debug>1) message('grad block1 ', paste(hl0$gradAll(theta[interceptPar]), collapse=','))
     
 
     ## loop over lambda
@@ -350,7 +391,7 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nlambda=100, la
         ## update jerr?
     }
     
-    list(path=Matrix::Matrix(out, sparse=TRUE), kktout=Matrix::Matrix(kktout, sparse=TRUE), flout=flout, blocks=Blocks, lambda=lambda)
+    list(path=Matrix::Matrix(out, sparse=TRUE), kktout=Matrix::Matrix(kktout, sparse=TRUE), flout=flout, blocks=Blocks, lambda=lambda, nodeId=nodeId)
 }
 
 ## .makeParams <- function(lambda, nlambda, theta, blocklist){
@@ -362,7 +403,6 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nlambda=100, la
 ## }
 
 blockHessian <- function(theta, sg, Blocks, X, onlyActive=TRUE, control, fuzz=.1, hl, exact=FALSE){
-    message('Update hessian')
     hess <- vector('list', length(Blocks))
     #browser()
     hl$LLall(theta, penalize=FALSE)

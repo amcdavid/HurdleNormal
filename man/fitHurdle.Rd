@@ -6,7 +6,7 @@
 \title{Fit the hurdle model coordinate-by-coordinate on a sample}
 \usage{
 autoLogistic(samp, fixed = NULL, nlambda = 200, lambda.min.ratio = 0.1,
-  parallel = FALSE)
+  parallel = FALSE, family = "binomial")
 
 fitHurdle(samp, parallel = TRUE, checkpoint_dir = NULL,
   makeModelArgs = NULL, returnNodePaths = FALSE, indices, ...)
@@ -14,13 +14,9 @@ fitHurdle(samp, parallel = TRUE, checkpoint_dir = NULL,
 \arguments{
 \item{samp}{matrix of data, columns are variables}
 
-\item{fixed}{unpenalized covariates to include.  NOT IMPLEMENTED for autoLogistic yet.}
-
-\item{nlambda}{number of knots in solution path}
-
-\item{lambda.min.ratio}{minimum lambda as function lambda0, the smallest lambda such that all coordinates are zero}
-
 \item{parallel}{parallelize over variables using "mclapply"?}
+
+\item{family}{in the case of \code{autoLogistic} one of "gaussian" or "logistic"}
 
 \item{checkpoint_dir}{(optional) directory to save the fit of each gene, useful for large problems.  If it exists, then completed genes will be automatically loaded.}
 
@@ -28,7 +24,7 @@ fitHurdle(samp, parallel = TRUE, checkpoint_dir = NULL,
 
 \item{returnNodePaths}{return node-wise output (solution paths and diagnostics for each node) as attribute `nodePaths`}
 
-\item{indices}{(optional) subset of indices to fit, useful for cluster parallelization.  NOT IMPLEMENTED.}
+\item{indices}{(optional) subset of indices to fit, useful for cluster parallelization.}
 
 \item{...}{passed to cgpaths}
 }

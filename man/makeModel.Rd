@@ -5,7 +5,7 @@
 \title{Generate a design matrix corresponding to the 2-1-0 hurdle}
 \usage{
 makeModel(zif, Fixed = matrix(1, nrow = nrow(zif), ncol = 1), center = TRUE,
-  scale = TRUE, conditionalCenter = FALSE, ..., tol = 0.001)
+  scale = FALSE, conditionalCenter = TRUE, ..., tol = 0.001)
 }
 \arguments{
 \item{zif}{zero-inflated covariates}
@@ -22,9 +22,9 @@ makeModel(zif, Fixed = matrix(1, nrow = nrow(zif), ncol = 1), center = TRUE,
 \item{tol}{tolerance for declaring a parameter equal to zero}
 }
 \value{
-design matrix
+design matrix, with attribute fixedCols giving indices of unpenalized intercept columns
 }
 \description{
-details
+Generate a design matrix corresponding to the 2-1-0 hurdle
 }
 
