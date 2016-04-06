@@ -125,13 +125,16 @@ Block <- function(this.model, blist, mlist, nlist, lambda, group='components', p
     ## end this.model provided
     else{
         bvec <- data.table(paridx=unlist(blist), block=rep(seq_along(blist), times=sapply(blist, length)))
+        if(any(duplicated(bvec$paridx))) stop('blist had duplicated parameters!')
         if(is.list(nlist)){
             nvec <- setNames(reshape2:::melt.list(nlist), c('block', 'nodeId'))
         } else{
             nvec <- data.table(block=seq_along(nlist), nodeId=nlist)
         }
+        if(any(duplicated(nvec$block))) stop('nlist had duplicated blocks!')
         if(missing(mlist)) mlist <- as.list(bvec$paridx)
         mvec <- data.table(paridx=unlist(mlist), mmidx=rep(seq_along(mlist), times=sapply(mlist, length)))
+        if(any(duplicated(mvec$mmidx))) stop('mlist had duplicated mmidx!')
         map <- merge(bvec, nvec, by='block')
         map <- merge(map, mvec, by='paridx')        
     }

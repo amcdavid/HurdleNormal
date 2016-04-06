@@ -1,5 +1,5 @@
 singletonMap <- function(nc, nf){
-    blist <- as.list(2:(nc-nf+1))
+    blist <- as.list((nf+1):(nc-nf+1))
     blist <- c(list(1:nf), blist)
     blist
 }
@@ -15,6 +15,7 @@ autoLogistic <- function(samp, fixed=NULL, nlambda=200, lambda.min.ratio=.1, par
     samp0 <- if(family=='binomial') (abs(samp)>0)*1 else samp
     applyfun <- if(parallel) function(X, FUN) parallel::mclapply(X, FUN, mc.preschedule=TRUE) else lapply
     if(is.null(fixed)) fixed <- matrix(1, nrow=nrow(samp0))
+    if(any(fixed[,1] != 1)) stop('Column 1 of `fixed` covariates must be intercept!')
     nid <- colnames(samp)
     blist <- singletonMap(ncol(samp)+ncol(fixed), ncol(fixed))
     
@@ -27,7 +28,7 @@ autoLogistic <- function(samp, fixed=NULL, nlambda=200, lambda.min.ratio=.1, par
         if( posobs > 2 && (family=='gaussian' | (nrow(samp0)-posobs)>2)){
             net <- glmnet::glmnet(model[,-1], #glmnet has a bug in which it always include the intercept `column` in its internal design, hence supplying our own
                                   ## and setting penalty.factor accordingly fails.
-                                  samp0[,i], family=family,lambda.min.ratio=lambda.min.ratio, nlambda=nlambda, penalty.factor=blk$lambda[-1], standardize=FALSE)            
+                                  samp0[,i], family=family,lambda.min.ratio=lambda.min.ratio, nlambda=nlambda, penalty.factor=blk$map$lambda[-1], standardize=FALSE)            
             path <- Matrix::t(coef(net))
         } else{
             net <- list(df=c(1), lambda=c(0))

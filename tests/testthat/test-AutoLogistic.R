@@ -83,10 +83,36 @@ test_that('pathList coincides with pathArray', {
 
 })
 
-## Test something here?
 fit <- fitHurdle(rgh, FALSE, makeModelArgs=list(scale=FALSE, conditionalCenter=TRUE, center=TRUE), returnNodePaths=TRUE, nlambda=10, penalty='full', control=list(tol=5e-2, newton0=TRUE, debug=0))
-al <- autoLogistic(rgh, nlambda=10, lambda.min.ratio=.01)
-al2 <- autoLogistic(rgh, family='gaussian',  nlambda=50, lambda.min.ratio=.01)
+al <- autoLogistic(rgh, nlambda=50, lambda.min.ratio=.01)
+## irrelevant fixed predictor
+al2 <- autoLogistic(rgh, fixed=cbind(1, fixedeff=rnorm(nrow(rgh))), family='gaussian',  nlambda=5, lambda.min.ratio=.1, returnNodePaths=TRUE)
+## no fixed
+al3 <- autoLogistic(rgh, family='gaussian',  nlambda=5, lambda.min.ratio=.1)
+## relevant fixed
+al4 <- autoLogistic(rgh, fixed=cbind(1, fixedeff=rgh[,4]+rnorm(nrow(rgh))/5), family='gaussian',  nlambda=5, lambda.min.ratio=.1)
+
+test_that('Fixed columns appear in paths', {
+    fixed <- attr(al2, 'nodePaths')[[1]]$path[, 'fixedeff']
+    expect_true(all(abs(fixed)>0))
+})
+
+
+test_that("Including irrelevant fixed columns doesn't change adjacency (much)", {
+    for(i in seq_along(al2$adjMat)){
+        expect_less_than(mean((al2$adjMat[[i]]-al3$adjMat[[i]])^2), .01)
+    }
+})
+
+
+test_that("Including relevant fixed columns changes adjacency", {
+    for(i in seq_along(al4$adjMat)){
+        expect_true(all(abs(al4$adjMat[[i]][,4])==0))
+    }
+})
+
+
+
 
 context('Edge interpolation')
 test_that('True edges are monotone increasing', {
