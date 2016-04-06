@@ -13,7 +13,7 @@ nativeMap <- function(p){
 ##'
 ##' @param zif zero-inflated covariates
 ##' @param nodeId names to be used for nodes.  `colnames` of `zif` will be used if provided.
-##' @param Fixed optional matrix of fixed predictors
+##' @param fixed optional matrix of fixed predictors
 ##' @param center center design matrix
 ##' @param scale scale design matrix
 ##' @param conditionalCenter in positive predictors, center only the non-zero components
@@ -22,7 +22,7 @@ nativeMap <- function(p){
 ##' @param tol tolerance for declaring a parameter equal to zero
 ##' @return design matrix, with attribute fixedCols giving indices of unpenalized intercept columns
 ##' @export
-makeModel <- function(zif, nodeId, Fixed=matrix(1, nrow=nrow(zif), ncol=1), center=TRUE, scale=FALSE, conditionalCenter=TRUE, ..., tol=.001){
+makeModel <- function(zif, nodeId, fixed=matrix(1, nrow=nrow(zif), ncol=1), center=TRUE, scale=FALSE, conditionalCenter=TRUE, ..., tol=.001){
     nonZ <- abs(zif)>tol
     if(conditionalCenter){
         for(i in seq_len(ncol(zif))){
@@ -41,14 +41,14 @@ makeModel <- function(zif, nodeId, Fixed=matrix(1, nrow=nrow(zif), ncol=1), cent
     ord <- c(seq(2, ncol(zif)+1),seq(2, ncol(zif)+1))
     M <- M[,order(ord)]
     M <- scale(M, center=center, scale=scale)
-    MM <- cbind(Fixed, M)
+    MM <- cbind(fixed, M)
     if(missing(nodeId)){
         nodeId <- colnames(zif)
     }
     if(length(nodeId) != ncol(zif)){
         stop('Length of `nodeId` must match `ncols(zif)`')
     }
-    structure(MM, fixedCols=seq_len(ncol(Fixed)), nodeId=nodeId)
+    structure(MM, fixedCols=seq_len(ncol(fixed)), nodeId=nodeId)
 }
 
 
@@ -96,7 +96,7 @@ Block <- function(this.model, blist, mlist, nlist, lambda, group='components', p
     ## this.model provided
     if(!missing(this.model)){
         nfixed <- length(attr(this.model, 'fixedCols'))
-        nodeId <- c('(Fixed)', attr(this.model, 'nodeId'))
+        nodeId <- c('(fixed)', attr(this.model, 'nodeId'))
 
         ## used to assign nodeIds and blocks when group=='components'
         p <- ncol(this.model)

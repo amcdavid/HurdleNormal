@@ -22,7 +22,7 @@ autoLogistic <- function(samp, fixed=NULL, nlambda=200, lambda.min.ratio=.1, par
     timing <- system.time(result <- applyfun(seq_len(ncol(samp)), function(i){
         model <- cbind(fixed, samp0[,-i])
         thisId <- nid[i]
-        blk <- Block(blist=blist, nlist=c('(Fixed)', setdiff(nid, thisId)))
+        blk <- Block(blist=blist, nlist=c('(fixed)', setdiff(nid, thisId)))
         posobs <- sum(samp0[,i]>0)
         
         if( posobs > 2 && (family=='gaussian' | (nrow(samp0)-posobs)>2)){
