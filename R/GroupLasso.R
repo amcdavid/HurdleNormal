@@ -30,7 +30,7 @@ makeModel <- function(zif, nodeId, fixed=NULL, center=TRUE, scale=FALSE, conditi
             zif[nonZ[,i],i] <- zifPos-mean(zifPos)
         }
     }
-    fixed <- if(is.null(fixed)) matrix(1, nrow=nrow(zif), ncol=1)
+    if(is.null(fixed)) fixed <- matrix(1, nrow=nrow(zif), ncol=1)
 
     ## for(i in seq_len(ncol(zif))){
     ##     cols <- seq(2*i-1, 2*i)
