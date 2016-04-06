@@ -330,40 +330,40 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
 
 
     ## Returns kkt divergence
-    kktfun <- function(b, theta, nonpengrad, lambda, flagBad0=TRUE){
+    kktfun <- function(b, theta, nonpengrad, lambda, gnormOnly=FALSE){
         sgrad <- nonpengrad[blocklist[[b]]]
         if(Blocks$lambdablock[b]<=0){
-            return(sqrt(sum(sgrad^2)))
+            gnorm <- sqrt(sum(sgrad^2))
+            tol <- gnorm
         } else{
             subtheta <- theta[blocklist[[b]]]
             tnorm <- sqrt(crossprod(subtheta, hess[[b]]) %*% subtheta)
             if(tnorm > 0){
                 pgrad <- sgrad + lambda * as.vector(hess[[b]] %*% subtheta)/tnorm
-                return(sqrt(sum(pgrad^2)))
+                gnorm <- sqrt(sum(pgrad^2))
+                tol <- gnorm
             } else{
-                psubgrad <- sqrt(sum(crossprod(sgrad, sqrtPen[[b]])^2))
-                if(psubgrad <lambda){
-                    return(0)
-                } else if(flagBad0){
-                    return(-99L)
-                } else{
-                    return(psubgrad)
-                }
+                gnorm <- sqrt(sum(crossprod(sgrad, sqrtPen[[b]])^2))
+                tol <- gnorm>lambda
             }
         }
+        if(gnormOnly) return(gnorm) else return(c(gnorm, tol))
     }
 
     ## estimate lambda0 given penalty
     gr <- hl$gradAll(theta)
-    l0block <- sapply(seq_along(blocklist), kktfun, theta=theta, nonpengrad=hl$gradAll(theta), lambda=0, flagBad0=FALSE)
+    l0block <- sapply(seq_along(blocklist), kktfun, theta=theta, nonpengrad=hl$gradAll(theta), lambda=0, gnormOnly=TRUE)
+    gradblock <- data.table(g0=l0block, block=seq_along(l0block), active=FALSE)
+    gradblock[block==1, active:=TRUE]
     l0 <- max(l0block)
+    #Blocks$map <- merge(Blocks$map, , by='block')
     if(l0<0){
         warning('Negative lambda0 should not happen')
         return(emptySol(lambda))
     }
     if(missing(lambda)) lambda <- 10^seq(log10(1.01*l0), log10(l0*lambda.min.ratio), length.out=nlambda)
 
-     out <- matrix(0, nrow=length(lambda), ncol=length(theta))
+    out <- matrix(0, nrow=length(lambda), ncol=length(theta))
     ## kkt conditions
     kktout <- matrix(0, nrow=length(lambda), ncol=length(blocklist))
     ## diagnostic flags
@@ -372,19 +372,24 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
     colnames(out) <- c(outer(1:p, c('D', 'C'),paste0), 'kbb')
     rownames(kktout) <- rownames(flout) <- rownames(out) <- lambda
 
+
     if(control$debug>1) message('grad block1 ', paste(hl0$gradAll(theta[interceptPar]), collapse=','))
     
 
     ## loop over lambda
     for(l in seq_along(lambda)){
         hl$setLambda(lambda[l])
-        sp <- solvePenProximal(theta, lambda[l], control, blocklist, LLall, gradAll, proxfun, kktfun, hess, pre0, gamma)
+        if(l>1){
+            gradblock <- safeRule(gradblock, lambda[l], lambda[l-1])
+        }
+        sp <- solvePenProximal(theta, lambda[l], control, blocklist, LLall, gradAll, proxfun, kktfun, hess, pre0, gamma, gradblock)
         gamma <- as.numeric(attr(sp, 'flag')['gamma'])
         theta <- out[l,] <- as.numeric(sp)
-        kktout[l,] <- attr(sp, 'kkt')
+        kktout[l,] <- attr(sp, 'kkt')[2,]
         flout[l,] <- attr(sp, 'flag')
+        gradblock <- attr(sp, 'gradblock')
         if(control$debug>0) message('Lambda = ', round(lambda[l], 3), ' rounds = ', attr(sp, 'flag')['round'], ' NNZ = ', attr(sp, 'flag')['nnz'], ' gamma = ', round(gamma, 3))
-        activeset <- sum(kktout[l,]>0)
+        activeset <- sum(gradblock$active)
         if(activeset >= n/2){
             out <- out[1:l,,drop=FALSE]
             kktout <- kktout[1:l,,drop=FALSE]
@@ -436,9 +441,13 @@ blockHessian <- function(theta, sg, Blocks, X, onlyActive=TRUE, control, fuzz=.1
     hess
 }
 
+safeRule <- function(gradblock, l1, l0){
+    gradblock[active==FALSE, active:=(2*l1-l0)<g0]
+    gradblock
+}
 
 ## Solve the penalized function using proximal gradient descent
-solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, proxfun, kktfun, hess, pre0, gamma){
+solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, proxfun, kktfun, hess, pre0, gamma, gradblock){
     feval <- geval <- 0
     ## total number of rounds
     mround <- round <- 0
@@ -457,8 +466,7 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
     thisll <- LLall(theta, penalize=FALSE)
     gr <- gradAll(penalize=FALSE)
 
-    kkt <- vapply(seq_along(blocklist), kktfun, NA_real_, theta=thetaPrime1, nonpengrad=gr, lambda=lambda, flagBad0=TRUE)
-    
+    kkt <- vapply(seq_along(blocklist), kktfun, c(NA_real_, 1), theta=thetaPrime1, nonpengrad=gr, lambda=lambda)
     if(control$debug>2){
         debugval <- list(pre=matrix(NA, nrow=control$maxrounds, ncol=p), thisll=rep(NA, control$maxrounds),
                          kkt=matrix(NA, nrow=control$maxrounds, ncol=length(blocklist)),
@@ -468,14 +476,14 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
         debugval <- NULL
     }
     
-    while(round < control$maxrounds && any(abs(kkt)>control$tol)){
+    while(round < control$maxrounds && any(abs(kkt[2,])>control$tol)){
         round <- round+1
         theta <- thetaPrime1-gamma*gr
         if(control$newton0){
             theta[blocklist[[1]]] <- thetaPrime1[blocklist[[1]]] - gamma*crossprod(pre0, gr[blocklist[[1]]])
         }
         
-        for(b in seq_along(blocklist)){
+        for(b in gradblock[active==TRUE,block]){
             ##apply proximal operator to block b
             theta[blocklist[[b]]] <- proxfun(b, theta, gamma, lambda)
         }
@@ -525,7 +533,8 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
             ## (no need if we haven't moved thetaPrime1)
             gr <- gradAll(penalize=FALSE)
             geval <- geval+length(blocklist)
-            kkt <- vapply(seq_along(blocklist), kktfun, NA_real_, theta=thetaPrime1, nonpengrad=gr, lambda=lambda, flagBad0=TRUE)
+            kkt <- vapply(seq_along(blocklist), kktfun, c(NA_real_, 1), theta=thetaPrime1, nonpengrad=gr, lambda=lambda)
+            gradblock[,active:=kkt[2,]>0]
 
             ## Debugging/tracing
             if(control$debug>1 && (round %% 10)==0 || control$debug>2){
@@ -544,7 +553,8 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
 
         } # end move
     } # end main loop
-    structure(theta, flag=c(converged=converged, round=round, geval=geval, feval=feval, gamma=gamma, nnz=sum(kkt>0)-1), kkt=kkt, debugval=debugval)
+    gradblock[,g0:=kkt[1,]]
+    structure(theta, flag=c(converged=converged, round=round, geval=geval, feval=feval, gamma=gamma, nnz=sum(kkt>0)-1), kkt=kkt, debugval=debugval, gradblock=gradblock)
 }
 
 
