@@ -22,7 +22,7 @@ nativeMap <- function(p){
 ##' @param tol tolerance for declaring a parameter equal to zero
 ##' @return design matrix, with attribute fixedCols giving indices of unpenalized intercept columns
 ##' @export
-makeModel <- function(zif, nodeId, fixed=matrix(1, nrow=nrow(zif), ncol=1), center=TRUE, scale=FALSE, conditionalCenter=TRUE, ..., tol=.001){
+makeModel <- function(zif, nodeId, fixed=NULL, center=TRUE, scale=FALSE, conditionalCenter=TRUE, ..., tol=.001){
     nonZ <- abs(zif)>tol
     if(conditionalCenter){
         for(i in seq_len(ncol(zif))){
@@ -30,6 +30,7 @@ makeModel <- function(zif, nodeId, fixed=matrix(1, nrow=nrow(zif), ncol=1), cent
             zif[nonZ[,i],i] <- zifPos-mean(zifPos)
         }
     }
+    fixed <- if(is.null(fixed)) matrix(1, nrow=nrow(zif), ncol=1)
 
     ## for(i in seq_len(ncol(zif))){
     ##     cols <- seq(2*i-1, 2*i)
