@@ -35,7 +35,9 @@ autoLogistic <- function(samp, fixed=NULL, nlambda=200, lambda.min.ratio=.1, par
             path <- Matrix::Matrix( c(1, rep(0, ncol(model)-1)), nrow=1, sparse=TRUE)
         }
         rownames(path) <- net$lambda
-        list(path=path, blocks=blk, lambda=net$lambda, df=net$df, nodeId=thisId)
+        res <- list(path=path, blocks=blk, lambda=net$lambda, df=net$df, nodeId=thisId)
+        class(res) <- 'SolPath'
+        res
     }))
     arr <- neighborhoodToArray(result, vnames=colnames(samp))
     if(returnNodePaths){
@@ -109,7 +111,9 @@ neighborhoodToArray <- function(pathList, nknots, vnames=NULL){
     safeApprox <- getSafeApprox(lpath)
     
     for(i in seq_len(P)){
-        gridlist[[i]] <- interpolateSummarizeCoefs(pathList[[i]], safeApprox)
+        if(inherits(pathList[[i]], 'SolPath')){
+            gridlist[[i]] <- interpolateSummarizeCoefs(pathList[[i]], safeApprox)
+        }
     }
     
     allgrid <- rbindlist(gridlist)

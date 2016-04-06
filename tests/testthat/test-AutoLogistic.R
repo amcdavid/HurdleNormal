@@ -43,7 +43,9 @@ pathList <- lapply(seq_along(ngh), function (i){
     gamma <- matrix(rep(c(0, seq(0, 1, length.out=nl-1)), times=length(ngh)), ncol=nl, byrow=T)
     ## path
     blk <- Block(blist=list(1, 2, 3, 4), nlist=nlists[[i]])
-    list(path=Matrix::Matrix(t(ngh[[i]]*gamma), sparse=T), lambda=ll, blocks=blk, nodeId=colnames(rgh)[i])
+    res <- list(path=Matrix::Matrix(t(ngh[[i]]*gamma), sparse=T), lambda=ll, blocks=blk, nodeId=colnames(rgh)[i])
+    class(res) <- "SolPath"
+    res
 })
 
 
@@ -92,6 +94,11 @@ al3 <- autoLogistic(rgh, family='gaussian',  nlambda=5, lambda.min.ratio=.1)
 ## relevant fixed
 al4 <- autoLogistic(rgh, fixed=cbind(1, fixedeff=rgh[,4]+rnorm(nrow(rgh))/5), family='gaussian',  nlambda=5, lambda.min.ratio=.1)
 
+test_that('Inherit from SolPath', {
+        expect_true(inherits(attr(al2, 'nodePaths')[[1]], 'SolPath'))
+
+})
+
 test_that('Fixed columns appear in paths', {
     fixed <- attr(al2, 'nodePaths')[[1]]$path[, 'fixedeff']
     expect_true(all(abs(fixed)>0))
@@ -110,7 +117,6 @@ test_that("Including relevant fixed columns changes adjacency", {
         expect_true(all(abs(al4$adjMat[[i]][,4])==0))
     }
 })
-
 
 
 

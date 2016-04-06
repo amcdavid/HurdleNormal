@@ -395,7 +395,9 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
         ## update jerr?
     }
     
-    list(path=Matrix::Matrix(out, sparse=TRUE), kktout=Matrix::Matrix(kktout, sparse=TRUE), flout=flout, blocks=Blocks, lambda=lambda, nodeId=nodeId)
+    res <- list(path=Matrix::Matrix(out, sparse=TRUE), kktout=Matrix::Matrix(kktout, sparse=TRUE), flout=flout, blocks=Blocks, lambda=lambda, nodeId=nodeId)
+    class(res) <- 'SolPath'
+    res
 }
 
 ## .makeParams <- function(lambda, nlambda, theta, blocklist){
@@ -542,7 +544,7 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
 
         } # end move
     } # end main loop
-    structure(theta, flag=c(converged=converged, round=round, geval=geval, feval=feval, gamma=gamma, nnz=sum(kkt>0)-1), kkt=kkt, debugval=debugval)     
+    structure(theta, flag=c(converged=converged, round=round, geval=geval, feval=feval, gamma=gamma, nnz=sum(kkt>0)-1), kkt=kkt, debugval=debugval)
 }
 
 
