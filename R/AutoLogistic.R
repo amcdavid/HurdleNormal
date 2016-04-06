@@ -1,5 +1,5 @@
 singletonMap <- function(nc, nf){
-    blist <- as.list((nf+1):(nc-nf+1))
+    blist <- as.list((nf+1):(nc+1))
     blist <- c(list(1:nf), blist)
     blist
 }
