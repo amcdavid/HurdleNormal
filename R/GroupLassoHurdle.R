@@ -1,14 +1,3 @@
-## Mapping from parameter indices to blocks
-## Only used in simulation so far...redundant with Block()?
-nativeMap <- function(p){
-    covariates <- rep(seq(2, p), each=2)
-    block <- c(1,                       #intercept
-               covariates)
-    total <- c(block, block, 1) #kbb
-    total
-}
-
-
 ##' Generate a design matrix corresponding to the 2-1-0 hurdle
 ##'
 ##' @param zif zero-inflated covariates
@@ -54,112 +43,6 @@ makeModel <- function(zif, nodeId, fixed=NULL, center=TRUE, scale=FALSE, conditi
 
 
 
-##' Define parameter groups
-##'
-##' Define parameter groups and relative penalization.
-##' If \code{this.model} is specified, then, neither \code{blist} nor \code{nlist} should be provided.
-##' If \code{this.model} is not specified then both of the preceeding must be provided.
-##' When \code{this.model} is provided, it is assumed to have been created by with \code{makeModel}.
-##'  Column indices indicated in the attribute `fixedCols` are unpenalized intercepts, then followed by pairs of interaction terms.
-##' The grouping corresponds to the parameter set for a node.
-##' Otherwise, only one of bidx or bset should be set, but this is not implemented yet.
-##' @details
-##' There are four components that all need to be mapped between each other.
-##' In increasing abstraction, with variable prefixes in parenthesis:
-##' 1. (p)arameter vector. The map is given in these terms. 
-##' 2. (mm) model matrix--columns from the covariate matrix.
-##' 3. (b)locks -- penalty groups
-##' 4. (n)odes. -- the graph-theoretic structure.
-##' 5. lambda -- penalties as a function of blocks.
-##' All of these components are provided in the `map`
-##' @param this.model (optional) a matrix created by \code{\link{makeModel}}
-##' @param blist a list of parameter indices, one per block.  By default the first block is assumed to be unpenalized.
-##' @param mlist a list of parameter indices, one per column of the model.matrix. If omitted, assumed to equal to the identity.
-##' @param nlist a named list of block indices, one per node
-##' @param group \code{character}: one of components, or none.
-##' @param penalty.scale optional list containing elements `scale` and `group`.
-##' `group` should be one of 'block' or 'none'.  `scale` should be \code{numeric} of length `blist` or the sum of the `blist` lengths.
-##' @return a list containing a data.table `map` giving the mapping between parameters, groups and penalty scales and some other components
-##' @export
-Block <- function(this.model, blist, mlist, nlist, lambda, group='components', penalty.scale=NULL){
-    ## only one of this.model, bidx and bset should be non-missing
-    ## group={components, none}
-    ## penalty scale should be provided as a list of indices and group={groups, components,none}
-
-
-    group <- match.arg(group, c('components', 'none'))
-    if(!is.null(penalty.scale)){
-        if(!is.list(penalty.scale)) stop("`penalty.scale` should be list with components `scale` and `group`")
-        penalty.scale.group <- match.arg(penalty.scale$group, c('components', 'none', 'groups'))
-        if(!is.numeric(penalty.scale$scale)) stop("`penalty.scale$scale` should give integer indices into groups or parameters")
-        penalty.scale.scale <- penalty.scale$scale
-    }
-    ## this.model provided
-    if(!missing(this.model)){
-        nfixed <- length(attr(this.model, 'fixedCols'))
-        nodeId <- c('(fixed)', attr(this.model, 'nodeId'))
-
-        ## used to assign nodeIds and blocks when group=='components'
-        p <- ncol(this.model)
-        nc <- (p-nfixed)/2 #penalized blocks
-        ## block index into model matrix
-        bidxMM <- c(rep(1, nfixed), (rep(1:nc, each=2)
-                        +1)) #offset from non-pen block
-        ## node index into parameter vector
-        nidxPar <- c(bidxMM, bidxMM, 1) #variance
-
-        ## group lasso
-        if(group=='components'){
-            ## block index into parameter
-            bidxPar <- nidxPar
-            ## node -> block map
-        } else{
-            nc <- (p-nfixed)               #regular lasso
-            bidxMM <- c(rep(1, nfixed), ((1:nc)+1))
-            bidxMM2 <- c(rep(1, nfixed), ((1:nc)+nc+1))
-            bidxPar <- c(bidxMM, bidxMM2, 1)
-        }
-        nodeMap <- data.table(nodeId, nidx=seq_along(nodeId))
-        map <- data.table(paridx=seq_len(2*p+1), block=bidxPar, mmidx=c(1:length(bidxMM), 1:length(bidxMM), NA), nidx=nidxPar)
-        map <- merge(map, nodeMap, by='nidx')
-    }
-    ## end this.model provided
-    else{
-        bvec <- data.table(paridx=unlist(blist), block=rep(seq_along(blist), times=sapply(blist, length)))
-        if(any(duplicated(bvec$paridx))) stop('blist had duplicated parameters!')
-        if(is.list(nlist)){
-            nvec <- setNames(reshape2:::melt.list(nlist), c('block', 'nodeId'))
-        } else{
-            nvec <- data.table(block=seq_along(nlist), nodeId=nlist)
-        }
-        if(any(duplicated(nvec$block))) stop('nlist had duplicated blocks!')
-        if(missing(mlist)) mlist <- as.list(bvec$paridx)
-        mvec <- data.table(paridx=unlist(mlist), mmidx=rep(seq_along(mlist), times=sapply(mlist, length)))
-        if(any(duplicated(mvec$mmidx))) stop('mlist had duplicated mmidx!')
-        map <- merge(bvec, nvec, by='block')
-        map <- merge(map, mvec, by='paridx')        
-    }
-    
-    if(is.null(penalty.scale)){
-        blocks <- sort(unique(map$block))
-        penalty.map <- data.table(block=blocks, lambda=c(0, rep(1, length(blocks)-1)))
-        penalty.scale.group <- 'groups'
-    }    
-    if(penalty.scale.group=='groups'){
-        map <- merge(map, penalty.map, by='block')
-    } else if(penalty.scale.group=='components'){
-        stop('Not implemented')
-    } else{
-        penalty.map <- data.table(paridx=seq_along(penalty.scale.scale), lambda=penalty.scale.lambda)
-        map <- merge(map, penalty.map, by='paridx')
-    }
-
-    setkey(map, paridx)
-    out <- list(map=map, nonpenpar=map[lambda<=0, paridx], nonpenMM=unique(map[lambda<=0 & !is.na(mmidx), mmidx]), nonpengrp=unique(map[lambda<=0, block]), lambdablock=map[,list(lambda=lambda[1]), keyby=block]$lambda)
-    class(out) <-  'Block'
-    out
-}
-
 ## Let K^{-1} = A^T A = U^T D U
 ## Solve
 ## argmin_x ||y-A^T x||^2 + lambda * ||x||
@@ -200,7 +83,7 @@ projectEllipse <- function(v, lambda, d, u, control){
 ##' @importFrom Rcpp sourceCpp
 ##' @export
 cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_character_, nlambda=100, lambda.min.ratio=if(length(y.zif)<ncol(this.model)) .005 else .05, lambda, penaltyFactor='full', control=list(tol=1e-3, maxrounds=300, debug=1), theta){
-    defaultControl <- list(tol=1e-3, maxrounds=300, debug=1, stepcontract=.5, stepsize=1, stepexpand=.1, FISTA=FALSE, newton0=FALSE)
+    defaultControl <- list(tol=1e-3, maxrounds=300, debug=1, stepcontract=.5, stepsize=1, stepexpand=.1, FISTA=FALSE, newton0=FALSE, safeRule=2)
     nocontrol <- setdiff(names(defaultControl), names(control))
     control[nocontrol] <- defaultControl[nocontrol]
     penaltyFactor <- match.arg(penaltyFactor, c('full', 'diagonal', 'identity'))
@@ -304,8 +187,8 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
     pre0 <- (penMat[[1]])/(max(eigval[[1]]))
 
     ## Returns proximal subtheta
-    proxfun <- function(b, theta, gamma, lambda){
-        subtheta <- theta[blocklist[[b]]]
+    proxfun <- function(b, subtheta, gamma, lambda){
+        #subtheta <- theta[blocklist[[b]]]
         if(Blocks$lambdablock[b]<=0 || lambda <=0){
             return(subtheta)
         } else {
@@ -380,7 +263,7 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
     for(l in seq_along(lambda)){
         hl$setLambda(lambda[l])
         if(l>1){
-            gradblock <- safeRule(gradblock, lambda[l], lambda[l-1])
+            gradblock <- safeRule(gradblock, lambda[l], lambda[l-1], control$safeRule)
         }
         sp <- solvePenProximal(theta, lambda[l], control, blocklist, LLall, gradAll, proxfun, kktfun, hess, pre0, gamma, gradblock)
         gamma <- as.numeric(attr(sp, 'flag')['gamma'])
@@ -389,7 +272,7 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
         flout[l,] <- attr(sp, 'flag')
         gradblock <- attr(sp, 'gradblock')
         if(control$debug>0) message('Lambda = ', round(lambda[l], 3), ' rounds = ', attr(sp, 'flag')['round'], ' NNZ = ', attr(sp, 'flag')['nnz'], ' gamma = ', round(gamma, 3))
-        activeset <- sum(gradblock$active)
+        activeset <- sum(kktout[l,]>0)
         if(activeset >= n/2){
             out <- out[1:l,,drop=FALSE]
             kktout <- kktout[1:l,,drop=FALSE]
@@ -441,8 +324,8 @@ blockHessian <- function(theta, sg, Blocks, X, onlyActive=TRUE, control, fuzz=.1
     hess
 }
 
-safeRule <- function(gradblock, l1, l0){
-    gradblock[active==FALSE, active:=(2*l1-l0)<g0]
+safeRule <- function(gradblock, l1, l0, rule){
+    gradblock[active==FALSE, active:=(rule*l1-l0)<g0]
     gradblock
 }
 
@@ -475,17 +358,17 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
     } else{
         debugval <- NULL
     }
-    
+    ## apparently indexing into gradblock is slow.
+    bActive <- gradblock[active==TRUE,block]
     while(round < control$maxrounds && any(abs(kkt[2,])>control$tol)){
         round <- round+1
-        theta <- thetaPrime1-gamma*gr
-        if(control$newton0){
-            theta[blocklist[[1]]] <- thetaPrime1[blocklist[[1]]] - gamma*crossprod(pre0, gr[blocklist[[1]]])
-        }
-        
-        for(b in gradblock[active==TRUE,block]){
+        for(b in bActive){
             ##apply proximal operator to block b
-            theta[blocklist[[b]]] <- proxfun(b, theta, gamma, lambda)
+            if(control$newton0 & b==1){
+                theta[blocklist[[b]]] <- thetaPrime1[blocklist[[b]]] - gamma*crossprod(pre0, gr[blocklist[[b]]])
+            } else{
+                theta[blocklist[[b]]] <- proxfun(b, thetaPrime1[blocklist[[b]]]-gamma*gr[blocklist[[b]]], gamma, lambda)
+            }
         }
         feval <- feval+1
         newll <- LLall(theta, penalize=FALSE)
@@ -533,8 +416,15 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
             ## (no need if we haven't moved thetaPrime1)
             gr <- gradAll(penalize=FALSE)
             geval <- geval+length(blocklist)
-            kkt <- vapply(seq_along(blocklist), kktfun, c(NA_real_, 1), theta=thetaPrime1, nonpengrad=gr, lambda=lambda)
-            gradblock[,active:=kkt[2,]>0]
+            kktA <- vapply(bActive, kktfun, c(NA_real_, 1), theta=thetaPrime1, nonpengrad=gr, lambda=lambda)
+            if(all(kktA[2,]<control$tol)){
+                kkt[,bActive] <- kktA
+                bInactive <- gradblock[active==FALSE,block]
+                kktI <- vapply(bInactive, kktfun, c(NA_real_, 1), theta=thetaPrime1, nonpengrad=gr, lambda=lambda)
+                kkt[,bInactive] <- kktI
+                gradblock[active==FALSE,active:=kktI[2,]>0]
+                bActive <- gradblock[active==TRUE,block]
+            }
 
             ## Debugging/tracing
             if(control$debug>1 && (round %% 10)==0 || control$debug>2){
@@ -554,7 +444,7 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
         } # end move
     } # end main loop
     gradblock[,g0:=kkt[1,]]
-    structure(theta, flag=c(converged=converged, round=round, geval=geval, feval=feval, gamma=gamma, nnz=sum(kkt>0)-1), kkt=kkt, debugval=debugval, gradblock=gradblock)
+    structure(theta, flag=c(converged=converged, round=round, geval=geval, feval=feval, gamma=gamma, nnz=sum(kkt[2,]>0)-1), kkt=kkt, debugval=debugval, gradblock=gradblock)
 }
 
 

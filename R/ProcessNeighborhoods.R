@@ -1,88 +1,42 @@
+## Mapping from parameter indices to blocks
+## Only used in simulation so far...redundant with Block()?
+nativeMap <- function(p){
+    covariates <- rep(seq(2, p), each=2)
+    block <- c(1,                       #intercept
+               covariates)
+    total <- c(block, block, 1) #kbb
+    total
+}
+
+
+
 singletonMap <- function(nc, nf){
     blist <- as.list((nf+1):(nc+1))
     blist <- c(list(1:nf), blist)
     blist
 }
 
-
-##' @export
-##' @import reshape
-##' @import data.table
-##' @import Matrix
-##' @describeIn fitHurdle Fit an auto-model (Ising or Gaussian) to \code{samp} using glmnet
-##' @param family in the case of \code{autoLogistic} one of "gaussian" or "logistic"
-autoLogistic <- function(samp, fixed=NULL, nlambda=200, lambda.min.ratio=.1, parallel=FALSE, family='binomial', returnNodePaths=FALSE){
-    samp0 <- if(family=='binomial') (abs(samp)>0)*1 else samp
-    applyfun <- if(parallel) function(X, FUN) parallel::mclapply(X, FUN, mc.preschedule=TRUE) else lapply
-    if(is.null(fixed)) fixed <- matrix(1, nrow=nrow(samp0))
-    if(any(fixed[,1] != 1)) stop('Column 1 of `fixed` covariates must be intercept!')
-    nid <- colnames(samp)
-    blist <- singletonMap(ncol(samp)+ncol(fixed), ncol(fixed))
-    
-    timing <- system.time(result <- applyfun(seq_len(ncol(samp)), function(i){
-        model <- cbind(fixed, samp0[,-i])
-        thisId <- nid[i]
-        blk <- Block(blist=blist, nlist=c('(fixed)', setdiff(nid, thisId)))
-        posobs <- sum(samp0[,i]>0)
-        
-        if( posobs > 2 && (family=='gaussian' | (nrow(samp0)-posobs)>2)){
-            net <- glmnet::glmnet(model[,-1], #glmnet has a bug in which it always include the intercept `column` in its internal design, hence supplying our own
-                                  ## and setting penalty.factor accordingly fails.
-                                  samp0[,i], family=family,lambda.min.ratio=lambda.min.ratio, nlambda=nlambda, penalty.factor=blk$map$lambda[-1], standardize=FALSE)            
-            path <- Matrix::t(coef(net))
-        } else{
-            net <- list(df=c(1), lambda=c(0))
-            path <- Matrix::Matrix( c(1, rep(0, ncol(model)-1)), nrow=1, sparse=TRUE)
-        }
-        rownames(path) <- net$lambda
-        res <- list(path=path, blocks=blk, lambda=net$lambda, df=net$df, nodeId=thisId)
-        class(res) <- 'SolPath'
-        res
-    }))
-    arr <- neighborhoodToArray(result, vnames=colnames(samp))
-    if(returnNodePaths){
-        return(structure(arr, timing=timing, nodePaths=result))
-    }
-    return(structure(arr, timing=timing))
-}
-
-##' Fit the hurdle model coordinate-by-coordinate on a sample
+##' Recursively flatten and bind together sparse matrices
 ##'
-##' @param samp matrix of data, columns are variables
-##' @param parallel parallelize over variables using "mclapply"?
-##' @param checkpoint_dir (optional) directory to save the fit of each gene, useful for large problems.  If it exists, then completed genes will be automatically loaded.
-##' @param makeModelArgs (optional) arguments passed to the model matrix function
-##' @param returnNodePaths return node-wise output (solution paths and diagnostics for each node) as attribute `nodePaths`
-##' @param indices (optional) subset of indices to fit, useful for cluster parallelization.
-##' @param ... passed to cgpaths
-##' @return list of fits, one per coordinate and an attribute "timing"
+##' @param x a matrix, or a list of matrices.
+##' @param sparse should a sparse result be returned?
+##' @return a Matrix, each column being a flattened matrix.
 ##' @export
-fitHurdle <- function(samp, parallel=TRUE, checkpoint_dir=NULL, makeModelArgs=NULL, returnNodePaths=FALSE, indices, ...){
-    applyfun <- if(parallel) function(X, FUN) parallel::mclapply(X, FUN, mc.preschedule=FALSE) else lapply
-    allindices <- seq_len(ncol(samp))
-    indices <- if(missing(indices))  allindices else indices
-    if(length(setdiff(indices, allindices))>0) stop('`indices` out of range')
-    timing <- system.time(result <- applyfun(indices, function(i){
-        message('node=', i, ' nodeId=', colnames(samp)[i])
-        if(!is.null(checkpoint_dir) && file.exists(fname <- file.path(checkpoint_dir, paste0('gene', i, '.rds')))){
-            res <- readRDS(fname)
-            ##res <- NA
+sparseCbind <- function(x, sparse=TRUE){
+    if(is.list(x)){
+        if(inherits(x[[1]], 'sparseMatrix')){
+            if(ncol(x[[1]])==1)             return(Matrix(do.call(cBind, x), sparse=sparse))
+            return(sparseCbind(lapply(x, function(y){
+                dim(y) <- c(nrow(y)^2, 1)
+                y
+            }), sparse=sparse))
         } else{
-            mm <- do.call(makeModel, c(list(samp[,-i]), makeModelArgs))
-            blk <- Block(mm)
-            blk$id <- i
-            res <- cgpaths(samp[,i], mm, Blocks=blk,  nodeId=colnames(samp)[i], ...)
-            if(!is.null(checkpoint_dir)) saveRDS(res, fname)
+            return(lapply(x, sparseCbind, sparse=sparse))
+        }
     }
-        res
-    }))
-    
-    arr <- neighborhoodToArray(result, vnames=colnames(samp))
-    if(returnNodePaths){
-        return(structure(arr, timing=timing, nodePaths=result))
-    }
-    return(structure(arr, timing=timing))
+    stop('Unreachable code')
 }
+
 
 ##' Convert neighborhood estimates fit on differing lambda paths into adjacency matrices
 ##'
@@ -96,8 +50,8 @@ neighborhoodToArray <- function(pathList, nknots, vnames=NULL){
         c(range=range(lambda), n=length(lambda))
     }
                             ))
-    nsol <- if(missing(nknots)) floor(max(log10(length(pathList)), 1)*median(lambdaRange[,'n'], na.rm=TRUE)) else nknots
     lambdaRange <- lambdaRange[lambdaRange[,'n']>3,]
+    nsol <- if(missing(nknots)) floor(max(log10(length(pathList)), 1)*median(lambdaRange[,'n'], na.rm=TRUE)) else nknots
     lmin <- min(lambdaRange[,'range1'], na.rm=TRUE)
     lmax <- max(lambdaRange[,'range2'], na.rm=TRUE)
     lpath <- exp(seq(log(lmin), log(lmax), length.out=nsol))
@@ -204,11 +158,10 @@ interpolateEdges <- function(Mpath, lambda, knot, nknot=100){
         knot <- seq(min(maxknot, max(nnz)), 2, length.out=nknot)
     }
     stopifnot(length(Mpath)==length(lambda))
-    lknots <- approx(nnz, lambda, knot)$y
+    lknots <- approx(nnz, lambda, knot, rule=2)$y
     edgeInterp <- list()
     for(i in seq_along(lknots)){
         lambdai <- lknots[i] #lambda corresponding to current edge count
-        browser(expr=all(lambdai<lambda) || all(lambdai>lambda))
         lidx <- findInterval(lambdai, lambda, all.inside=TRUE) #greatest lambda smaller than lambdai
         gamma <- (lambda[lidx]-lambdai)/(lambda[lidx]-lambda[lidx+1]) #how much closer is lambdai to lambda[lidx] than lambda[lidx+1]
         edgeInterp[[i]] <- Mpath[[lidx]]*(1-gamma)+Mpath[[lidx+1]]*(gamma)
