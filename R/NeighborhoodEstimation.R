@@ -266,14 +266,16 @@ collectStability <- function(stabout, fdr=.02, stabilityCheckpointDir=NULL){
         tt <- try({
         xx <- get(i)
         ee <- interpolateEdges(xx$adjMat, xx$lambda, iknot)
-        stabFlat <- stabFlat+abs(sparseCbind(ee$edgeInterp))>0
+        hasedge <- (abs(sparseCbind(ee$edgeInterp))>0)*1
+        #print(sum(hasedge))
+        stabFlat <- stabFlat+ hasedge
+        #print(table(as.vector(stabFlat)))
         si <- si+1
         })
         if(inherits(tt, 'try-error')) warning('Error reading trial ', i, ' in ', stabilityCheckpointDir)
     }
     stabFlat <- stabFlat/si
-
-    fdri <- which(abs(iknot-floor(fdr*p^2))<.001)[1]
+    fdri <- which.min(abs(iknot-floor(fdr*p^2)))
     fdrStab <- stabFlat[,fdri]
     dim(fdrStab) <- c(p, p)
     list(stabFlat, estEdges=iknot, fdrStab)
