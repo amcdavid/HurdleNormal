@@ -75,20 +75,20 @@ test_that('pathList coincides with pathArray', {
             l <- pl$lambda[ipath]            
             llo <- which(pal<l)
             arrayLess <- testSlice(llo, ipath, i)
-            expect_more_than(length(setdiff(arrayLess[[1]], arrayLess[[2]])), -0.1)
+            expect_gt(length(setdiff(arrayLess[[1]], arrayLess[[2]])), -0.1)
 
             lhi <- which(pal>l)
             arrayMore <- testSlice(llo, ipath, i)
-            expect_more_than(length(setdiff(arrayMore[[2]], arrayMore[[1]])), -0.1)
+            expect_gt(length(setdiff(arrayMore[[2]], arrayMore[[1]])), -0.1)
         }
     }
 
 })
 
-fit <- fitHurdle(rgh, FALSE, makeModelArgs=list(scale=FALSE, conditionalCenter=TRUE, center=TRUE), returnNodePaths=TRUE, nlambda=10, penalty='full', control=list(tol=5e-2, newton0=TRUE, debug=0))
+fit <- fitHurdle(rgh, parallel=FALSE, makeModelArgs=list(scale=FALSE, conditionalCenter=TRUE, center=TRUE), keepNodePaths=TRUE, nlambda=10, penalty='full', control=list(tol=5e-2, newton0=TRUE, debug=0))
 al <- autoLogistic(rgh, nlambda=50, lambda.min.ratio=.01)
 ## irrelevant fixed predictor
-al2 <- autoLogistic(rgh, fixed=cbind(1, fixedeff=rnorm(nrow(rgh))), family='gaussian',  nlambda=5, lambda.min.ratio=.1, returnNodePaths=TRUE)
+al2 <- autoLogistic(rgh, fixed=cbind(1, fixedeff=rnorm(nrow(rgh))), family='gaussian',  nlambda=5, lambda.min.ratio=.1, keepNodePaths=TRUE)
 ## no fixed
 al3 <- autoLogistic(rgh, family='gaussian',  nlambda=5, lambda.min.ratio=.1)
 ## relevant fixed
@@ -107,7 +107,7 @@ test_that('Fixed columns appear in paths', {
 
 test_that("Including irrelevant fixed columns doesn't change adjacency (much)", {
     for(i in seq_along(al2$adjMat)){
-        expect_less_than(mean((al2$adjMat[[i]]-al3$adjMat[[i]])^2), .01)
+        expect_lt(mean((al2$adjMat[[i]]-al3$adjMat[[i]])^2), .01)
     }
 })
 

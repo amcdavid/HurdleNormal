@@ -48,5 +48,5 @@ test_that('Can fit', {
     thetareg <- optim(paths1$path[13,], hm$LLall, hm$gradAll, method='L-BFGS-B', hessian=TRUE, control=list(pgtol=1-8, maxit=1e4, factr=1e5))
     distreg <- (paths1$path[13,]-thetareg$par)
     manoblis <- crossprod(distreg, thetareg$hess) %*% distreg
-    expect_less_than(manoblis, sqrt(1e-6))
+    expect_lt(manoblis, sqrt(1e-6))
 })

@@ -72,7 +72,7 @@ test_that('Marginals for Gdep', {
 
     
     suppressWarnings(gibbs1d <- chisq.test(table(cut(df$X1, breaks=c(f$q, max(f$q)+EPS), right=FALSE)), p=f$f))
-    expect_more_than(gibbs1d$p.value, .05)
+    expect_gt(gibbs1d$p.value, .05)
 })
 
 ## test condition distributions for non-zero terms, including offset
@@ -97,9 +97,9 @@ test_that('Conditionals for Hlowdep', {
     ## g12 both coef null
     expect_true(all(abs(testslow[1,3:4])<2))
     ## g21 continuous sig
-    expect_more_than(testslow[2,3],2)
+    expect_gt(testslow[2,3],2)
     ## binary not
-    expect_less_than(abs(testslow[2,4]),2)
+    expect_lt(abs(testslow[2,4]),2)
     Hupdep <- getGibbs(Hupdep)
     testshi <- adjustedCondDistr(Hupdep)    
 })
