@@ -66,8 +66,10 @@ getDensity <- function(hs, ...){
 
 
 ##' Convert from old style to new style parameter vector or vice versa
+##'
+##' This just used to bridge between the R and C++ likelihood calcs, hence is legacy code now.
 ##' @param theta parameter vector
-##' @param unpack if TRUE convert from old style to new, else convert from new to old
+##' @param method \code{character} one of 'unpack', 'pack', or 'gradient'
 ##' @return ordered parameter
 unpackTheta <- function(theta, method='unpack'){
     p <- (length(theta)-3)/4+1
@@ -119,8 +121,11 @@ wrapGradAll <- function(hl, theta, penalize){
 ##'
 ##' @param hs HurdleStructure
 ##' @param using 'gibbs' or 'sample'
+##' @param testGrad Should we check the gradient for convergence.
+##' @param engine \code{character}.  If `R` then the R likelihood/gradient will be used. Else C++.
 ##' @param ... passed to optim
 ##' @return list of length two giving parameter values and standard errors. j is the index of the response, i is the index of the coefficient.
+##' @importFrom reshape2 melt
 ##' @export
 getConditionalMLE <- function(hs,using='gibbs', testGrad=FALSE, engine='R', ...){
     samp <-  if(using=='gibbs') hs$gibbs else hs$sample
@@ -172,7 +177,7 @@ momentChar <- function(hs, v){
 }
 
 getJoint <- function(fit){
-    C <- lapply(cast(fit$Parm, i~j | par), function(x) as.matrix(x[,-1]))
+    C <- lapply(reshape::cast(fit$Parm, i~j | par), function(x) as.matrix(x[,-1]))
     G <- C$gba
     diag(G) <- diag(C$gbb)
     H <- C$hba + t(C$hab)
@@ -185,6 +190,7 @@ getJoint <- function(fit){
 }
 
 
+## Used to simulate Erdos-Renyi networks
 simulateHurdle210 <- function(N, p, dependence='G', structure='independence', structureArgs=list(sparsity=.1, groupwise=FALSE), intensityArgs=list(G=1, Hupper=1, Hlower=1, K=-.3, gamma=1), Gdiag=-14, Hdiag=5, Kdiag=1, tweak=NULL, tweakArgs=list(lH0=4, lG0 =2)){
     dependence <- match.arg(dependence, c('G', 'Hupper', 'Hlower', 'K'), several.ok=TRUE)
     structure <- match.arg(structure, c('independence', 'sparse', 'chain'))

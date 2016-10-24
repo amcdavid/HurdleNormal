@@ -20,6 +20,7 @@ makeModel <- function(zif, nodeId, fixed=NULL, center=TRUE, scale=FALSE, conditi
         }
     }
     if(is.null(fixed)) fixed <- matrix(1, nrow=nrow(zif), ncol=1)
+    if(!is.matrix(fixed) && !is.numeric(fixed)) stop('`Fixed` must be a numeric matrix')
 
     ## for(i in seq_len(ncol(zif))){
     ##     cols <- seq(2*i-1, 2*i)
@@ -71,13 +72,13 @@ projectEllipse <- function(v, lambda, d, u, control){
 ##' @param y.zif (zero-inflated) response
 ##' @param this.model model matrix used for both discrete and continuous linear predictors
 ##' @param Blocks output from \code{Block} giving the grouping/scaling for the penalization.
+##' @param nodeId optional labels for the nodes.  will be used to stitch to
 ##' @param nlambda if `lambda` is not provided, then the number of lambda to interpolate between
 ##' @param lambda.min.ratio if `lambda` is not provided, then the left end of the solution path as a function of the lambda0, the lambda for the empty model
 ##' @param lambda penalty path desired
 ##' @param penaltyFactor one of `full`, `diagonal` or `identity` giving how the penalty should be scaled \emph{blockwise}
 ##' @param control optimization control parameters
 ##' @param theta (optional) initial guess for parameter
-##' @param blocks object of Blocks giving blocking and block-specific penalization
 ##' @return matrix of parameters, one row per lambda
 ##' @useDynLib HurdleNormal
 ##' @importFrom Rcpp sourceCpp
@@ -298,7 +299,6 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
 
 blockHessian <- function(theta, sg, Blocks, X, onlyActive=TRUE, control, fuzz=.1, hl, exact=FALSE){
     hess <- vector('list', length(Blocks))
-    #browser()
     hl$LLall(theta, penalize=FALSE)
     gpart <- hl$gpart()
     gplusc <- hl$gplusc()
@@ -394,7 +394,7 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
         if(move) {
             if(control$FISTA){
                 omega <- mround/(mround+5)
-                browser(expr=round>100)
+                #browser(expr=round>100)
             ## accept proposed proximal point, and extrapolate
                 thetaTmp <- theta + omega*(theta-thetaPrime0)
                 thetaPrime0 <- thetaPrime1

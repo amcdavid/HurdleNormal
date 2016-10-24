@@ -20,12 +20,13 @@
 ##' @param blist a list of parameter indices, one per block.  By default the first block is assumed to be unpenalized.
 ##' @param mlist a list of parameter indices, one per column of the model.matrix. If omitted, assumed to equal to the identity.
 ##' @param nlist a named list of block indices, one per node
+##' @param lambda currently ignored
 ##' @param group \code{character}: one of components, or none.
 ##' @param penalty.scale optional list containing elements `scale` and `group`.
 ##' `group` should be one of 'block' or 'none'.  `scale` should be \code{numeric} of length `blist` or the sum of the `blist` lengths.
 ##' @return a list containing a data.table `map` giving the mapping between parameters, groups and penalty scales and some other components
 ##' @export
-Block <- function(this.model, blist, mlist, nlist, lambda, group='components', penalty.scale=NULL){
+Block <- function(this.model, blist, mlist, nlist, group='components', lambda, penalty.scale=NULL){
     ## only one of this.model, bidx and bset should be non-missing
     ## group={components, none}
     ## penalty scale should be provided as a list of indices and group={groups, components,none}
@@ -106,10 +107,11 @@ Block <- function(this.model, blist, mlist, nlist, lambda, group='components', p
 
 
 ##' @export
-##' @import reshape
 ##' @import data.table
 ##' @import Matrix
 ##' @describeIn fitHurdle Fit an auto-model (Ising or Gaussian) to \code{samp} using glmnet.  checkpointDir is currently ignored.
+##' @param nlambda number of lambda values on grid (default 200)
+##' @param lambda.min.ratio minimum lambda ratio (as a function of lambda0, where the first predictor enters; default .1)
 ##' @param family in the case of \code{autoLogistic} one of "gaussian" or "logistic"
 autoLogistic <- function(samp, fixed=NULL, parallel=FALSE, keepNodePaths=FALSE, checkpointDir, nlambda=200, lambda.min.ratio=.1, family='binomial'){
     samp0 <- if(family=='binomial') (abs(samp)>0)*1 else samp
@@ -155,10 +157,11 @@ accessDirOrDie <- function(dir){
 ##' Fit the hurdle model coordinate-by-coordinate on a sample
 ##'
 ##' @param samp matrix of data, columns are variables
+##' @param fixed data.frame of fixed covariates (to be conditioned upon)
 ##' @param parallel parallelize over variables using "mclapply"?
+##' @param keepNodePaths return node-wise output (solution paths and diagnostics for each node) as attribute `nodePaths`
 ##' @param checkpointDir (optional) directory to save the fit of each gene, useful for large problems.  If it exists, then completed genes will be automatically loaded.
 ##' @param makeModelArgs (optional) arguments passed to the model matrix function
-##' @param keepNodePaths return node-wise output (solution paths and diagnostics for each node) as attribute `nodePaths`
 ##' @param indices (optional) subset of indices to fit, useful for cluster parallelization.
 ##' @param ... passed to cgpaths
 ##' @return list of fits, one per coordinate and an attribute "timing"

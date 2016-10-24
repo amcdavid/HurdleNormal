@@ -8,16 +8,22 @@ ggally_hurdle(data, mapping, lwd.regression = 1, lwd.axis = 2,
   size.point = 1, ...)
 }
 \arguments{
-\item{data}{}
+\item{data}{data in which plot is evaluated}
 
-\item{mapping}{}
+\item{mapping}{a ggplot \code{mapping}}
 
-\item{...}{}
+\item{lwd.regression}{line width for regression line}
+
+\item{lwd.axis}{line width for conditional mean along axis}
+
+\item{size.point}{size of points in scatter plot}
+
+\item{...}{passed to stat_hurdle1d}
 }
 \value{
 plot
 }
 \description{
-.. content for \details{} ..
+Wrapper so ggally can use \code{geom_hurdle}
 }
 

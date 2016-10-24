@@ -42,7 +42,8 @@ sparseCbind <- function(x, sparse=TRUE){
 ##'
 ##' Join a series of paths fit node-wise into a list of adjacency matrices.
 ##' @param pathList a list of paths (coefficients in columns, paths in rows)
-##' @param vnames a vector of names to be applied to the resulting adjacency matrix
+##' @param nknots number of knots (points along solution path) to consider.
+##' @param vnames a vector of names to be applied to the resulting adjacency matrix. The \code{nodeId} in each element in the \code{pathList} will be used if omitted.
 ##' @return list of (sparse) adjacency matrices, the number of non-zero elements for each matrix, and the lambda for each matrix.
 neighborhoodToArray <- function(pathList, nknots, vnames=NULL){
     lambdaRange <- t(sapply(pathList, function(x){
@@ -109,7 +110,6 @@ getSafeApprox <- function(lpath){
 
 ##' Interpolate a solution path using approxFun and reduce the coefficients in a block to their signed L2 norm
 ##' @param sol solution (a list containing a sparse neighborhood matrix and the lambda over which it was evaluated)
-##' @param blk a data table mapping between columns of sol$path and nodes
 ##' @param approxFun a function interpolating or otherwise approximating the solution between nodes
 ##' @return data.table with columns `y` giving normed, interpolated values, `x` giving lamba values and `block` giving the node in question
 interpolateSummarizeCoefs <- function(sol, approxFun){

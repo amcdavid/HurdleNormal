@@ -12,6 +12,10 @@ getConditionalMLE(hs, using = "gibbs", testGrad = FALSE, engine = "R",
 
 \item{using}{'gibbs' or 'sample'}
 
+\item{testGrad}{Should we check the gradient for convergence.}
+
+\item{engine}{\code{character}.  If `R` then the R likelihood/gradient will be used. Else C++.}
+
 \item{...}{passed to optim}
 }
 \value{

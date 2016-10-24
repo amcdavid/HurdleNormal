@@ -49,10 +49,12 @@ stat_hurdle1d <- function(mapping = NULL, data = NULL, geom = "segment",
 
 ##' Wrapper so ggally can use \code{geom_hurdle}
 ##'
-##' .. content for \details{} ..
-##' @param data 
-##' @param mapping 
-##' @param ... 
+##' @param data data in which plot is evaluated
+##' @param mapping a ggplot \code{mapping}
+##' @param lwd.regression line width for regression line
+##' @param lwd.axis line width for conditional mean along axis
+##' @param size.point size of points in scatter plot
+##' @param ... passed to stat_hurdle1d
 ##' @return plot
 ##' @export
 ggally_hurdle <- function(data, mapping, lwd.regression=1, lwd.axis=2, size.point=1, ...){

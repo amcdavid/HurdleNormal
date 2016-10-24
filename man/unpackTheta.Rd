@@ -9,12 +9,12 @@ unpackTheta(theta, method = "unpack")
 \arguments{
 \item{theta}{parameter vector}
 
-\item{unpack}{if TRUE convert from old style to new, else convert from new to old}
+\item{method}{\code{character} one of 'unpack', 'pack', or 'gradient'}
 }
 \value{
 ordered parameter
 }
 \description{
-Convert from old style to new style parameter vector or vice versa
+This just used to bridge between the R and C++ likelihood calcs, hence is legacy code now.
 }
 

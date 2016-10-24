@@ -1,8 +1,8 @@
 setClass("HurdleLikelihood", representation(pointer = "externalptr", p='integer'))
 
 HurdleLikelihood_method <- function(name) {
-paste( "HurdleLikelihood", name, sep = "__" )
- }
+    paste( "HurdleLikelihood", name, sep = "__" )
+}
 
 validateTheta <- function(theta, p){
     stopifnot(length(theta)==2*p+1)

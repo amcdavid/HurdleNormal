@@ -1,3 +1,9 @@
+## Quell warnings about missing imports from base packages
+##' @importFrom stats approx coef cor.test median na.omit optim optimize rnorm runif setNames var
+##' @importFrom utils file_test
+##' @importFrom methods new
+NULL
+
 expit <- function(x) exp(x)/(1+exp(x))
 logit <- function(x) log(x/(1-x))
 
