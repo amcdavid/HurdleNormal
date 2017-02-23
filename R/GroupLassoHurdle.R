@@ -12,7 +12,7 @@
 ##' @return design matrix, with attribute fixedCols giving indices of unpenalized intercept columns
 ##' @export
 makeModel <- function(zif, nodeId, fixed=NULL, center=TRUE, scale=FALSE, conditionalCenter=TRUE, ..., tol=.001){
-    nonZ <- abs(zif)>tol
+    nonZ <- not_zero(zif, tol)
     if(conditionalCenter){
         for(i in seq_len(ncol(zif))){
             zifPos <- zif[nonZ[,i],i]
@@ -43,6 +43,9 @@ makeModel <- function(zif, nodeId, fixed=NULL, center=TRUE, scale=FALSE, conditi
 }
 
 
+not_zero <- function(x, tol=0){
+    abs(x)>tol   
+}
 
 ## Let K^{-1} = A^T A = U^T D U
 ## Solve
@@ -55,7 +58,7 @@ projectEllipse <- function(v, lambda, d, u, control){
     r=0
     error_r=sum(v^2/(d*r+lambda)^2)-1
     r_iter=0
-    while(abs(error_r)>=r_solve_thresh && r_iter<max_r_iters){
+    while(not_zero(error_r, r_solve_thresh) && r_iter<max_r_iters){
         r_iter=r_iter+1
         if(r_iter==max_r_iters){ warning("Linesearch iteration exceeded") }
         slope=2*sum(v^2*d/(d*r+lambda)^3)
@@ -83,7 +86,7 @@ projectEllipse <- function(v, lambda, d, u, control){
 ##' @useDynLib HurdleNormal
 ##' @importFrom Rcpp sourceCpp
 ##' @export
-cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_character_, nlambda=100, lambda.min.ratio=if(length(y.zif)<ncol(this.model)) .005 else .05, lambda, penaltyFactor='full', control=list(tol=1e-3, maxrounds=300, debug=1), theta){
+cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_character_, nlambda=50, lambda.min.ratio=if(length(y.zif)<ncol(this.model)) .01 else .15, lambda, penaltyFactor='full', control=list(tol=1e-3, maxrounds=300, debug=1), theta){
     defaultControl <- list(tol=1e-3, maxrounds=300, debug=1, stepcontract=.5, stepsize=1, stepexpand=.1, FISTA=FALSE, newton0=FALSE, safeRule=2, refit=TRUE)
     nocontrol <- setdiff(names(defaultControl), names(control))
     control[nocontrol] <- defaultControl[nocontrol]
@@ -255,6 +258,7 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
     names(nloglik_np) <- rownames(path_np) <- rownames(kktout) <- rownames(flout) <- rownames(out) <- lambda
 
     ## loop over lambda
+    refitted <- FALSE
     for(l in seq_along(lambda)){
         hl$setLambda(lambda[l])
         if(l>1){
@@ -269,7 +273,9 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
         if(control$debug>0) message('Lambda = ', round(lambda[l], 3), ' rounds = ', attr(sp, 'flag')['round'], ' NNZ = ', attr(sp, 'flag')['nnz'], ' gamma = ', round(gamma, 3))
         activeset <- sum(kktout[l,]>0)
         if(control$refit){
-            refitted = refitModel(theta, this.model, y.zif, blocks=Blocks, control=list(factr=1e12))
+            if(is.logical(refitted) || !all( not_zero(out[l-1,]) == not_zero(theta)) ){
+                refitted <- refitModel(theta, this.model, y.zif, blocks=Blocks, control=list(factr=1e9))
+            }
             nloglik_np[l] = refitted$value
             path_np[l,refitted$activetheta] = refitted$par
         }
@@ -287,8 +293,10 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
     res
 }
 
+globalVariables(c('active'))
+
 refitModel <- function(theta, this.model, y.zif, activetheta, blocks, fuzz=0, control=list()){
-    if(missing(activetheta))  activetheta <- which(abs(theta)>fuzz)
+    if(missing(activetheta))  activetheta <- which(not_zero(theta, fuzz))
     activemm = unique(na.omit(blocks$map[list(paridx=activetheta),mmidx, on='paridx']))
     hl0 <- HurdleLikelihood(y.zif, this.model[,activemm,drop=FALSE], theta=theta[activetheta], lambda=0)
     o <- optim(theta[activetheta], hl0$LLall, hl0$gradAll, penalize=FALSE, method='L-BFGS-B', control=control)
@@ -366,7 +374,7 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
     }
     ## apparently indexing into gradblock is slow.
     bActive <- gradblock[active==TRUE,block]
-    while(round < control$maxrounds && any(abs(kkt[2,])>control$tol)){
+    while(round < control$maxrounds && any(not_zero(kkt[2,], control$tol))){
         round <- round+1
         for(b in bActive){
             ##apply proximal operator to block b
@@ -455,6 +463,11 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
 
 
 
+
+#' Plot a solution path
+#'
+#' @param cgpaths result of \code{cgpaths}
+#' @importFrom ggplot2 scale_x_log10
 plotSolPath <- function(cgpaths){
     l2 <- sapply(cgpaths$blocks, function(b){
         rowSums(cgpaths$path[,b]^2)
