@@ -43,9 +43,10 @@ sparseCbind <- function(x, sparse=TRUE){
 ##' Join a series of paths fit node-wise into a list of adjacency matrices.
 ##' @param pathList a list of paths (coefficients in columns, paths in rows)
 ##' @param nknots number of knots (points along solution path) to consider.
+##' @param nobs number of observations in data (used to calculate BIC)
 ##' @param vnames a vector of names to be applied to the resulting adjacency matrix. The \code{nodeId} in each element in the \code{pathList} will be used if omitted.
-##' @return list of (sparse) adjacency matrices, the number of non-zero elements for each matrix, and the lambda for each matrix.
-neighborhoodToArray <- function(pathList, nknots, vnames=NULL){
+##' @return list of (sparse) adjacency matrices, the number of non-zero elements (edges, before enforcing symmetry) for each matrix, the lambda for each matrix, the non-penalized, refitted pseudo log-likelihood, the number of parameters per edge, and the BIC
+neighborhoodToArray <- function(pathList, nknots, nobs, vnames=NULL){
     lambdaRange <- t(sapply(pathList, function(x){
         lambda <- if('lambda' %in% names(x))  x$lambda else 0
         c(range=range(lambda), n=length(lambda))
@@ -63,11 +64,13 @@ neighborhoodToArray <- function(pathList, nknots, vnames=NULL){
         P <- length(vnames)
     }
     gridlist <- list()
+    loglikmatrix <- matrix(0, nrow=P, ncol=length(lpath))
     safeApprox <- getSafeApprox(lpath)
-    
     for(i in seq_len(P)){
         if(inherits(pathList[[i]], 'SolPath')){
             gridlist[[i]] <- interpolateSummarizeCoefs(pathList[[i]], safeApprox)
+            llnp <- pathList[[i]]$loglik_np
+            loglikmatrix[i,] <- safeApprox(pathList[[i]]$lambda, llnp, yright=llnp[1])$y
         }
     }
     
@@ -79,14 +82,18 @@ neighborhoodToArray <- function(pathList, nknots, vnames=NULL){
     allgrid <- merge(allgrid, nodeId, by='nodeId')
     setkey(allgrid, x, i,j)
     adjMat <- list()
-    nnz <- list()
+    n_param_per_edge <- nnz <- list()
     for(lidx in seq_along(lpath)){
         l <- lpath[lidx]
         ag <- allgrid[list(x=l),,nomatch=0]
         adjMat[[lidx]] <- Matrix::sparseMatrix(i=ag[,i], j=ag[,j], x=ag[,y], dims=c(P, P), dimnames=list(vnames, vnames))
         nnz[[lidx]] <- sum(abs(adjMat[[lidx]])>0)
+        n_param_per_edge[[lidx]] <- sum(ag$npar)/
+            (if(nnz[[lidx]]>0) nnz[[lidx]] else 1) #don't divide by zero
     }
-    list(adjMat=adjMat, trueEdges=unlist(nnz), lambda=lpath)
+    out = list(adjMat=adjMat, trueEdges=unlist(nnz), lambda=lpath, pseudo_loglik_np=colSums(loglikmatrix), n_param_per_edge=unlist(n_param_per_edge))
+    out$BIC = -2*out$pseudo_loglik_np + log(nobs)*out$trueEdges*out$n_param_per_edge
+    out
 }
 
 
@@ -97,10 +104,10 @@ neighborhoodToArray <- function(pathList, nknots, vnames=NULL){
 ##' @param lpath grid of points over which interpolation is required
 ##' @return function of (x,y) providing the interpolations for x=lpath
 getSafeApprox <- function(lpath){
-    fun <- function(x, y){
+    fun <- function(x, y, yright=0){
         lx <- length(x)
         if(lx>0){
-            approx(x, y, lpath, rule=2, yright=0, method=ifelse(lx<2, 'constant', 'linear'))
+            approx(x, y, lpath, rule=2, yright=yright, method=ifelse(lx<2, 'constant', 'linear'))
         } else{
             list(x=numeric(0), y=numeric(0))
         }
@@ -123,7 +130,7 @@ interpolateSummarizeCoefs <- function(sol, approxFun){
     setnames(trip, c('j', 'x'), c('paridx', 'Coef'))
     trip <- merge(trip, blk, by='paridx')
     interpolate <- trip[,approxFun(x=lambda, y=Coef), keyby=list(paridx, nodeId)]
-    summarized <- interpolate[,list(y=mean(y^2)*sign(y[which.max(abs(y))]) ), keyby=list(x,nodeId)]
+    summarized <- interpolate[,list(y=mean(y^2)*sign(y[which.max(abs(y))]), npar=.N), keyby=list(x,nodeId)]
     summarized[,nodeId1:=sol$nodeId]
     summarized[abs(y)>0,]
 }

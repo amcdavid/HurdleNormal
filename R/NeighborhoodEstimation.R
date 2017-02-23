@@ -73,7 +73,7 @@ Block <- function(this.model, blist, mlist, nlist, group='components', lambda, p
         bvec <- data.table(paridx=unlist(blist), block=rep(seq_along(blist), times=sapply(blist, length)))
         if(any(duplicated(bvec$paridx))) stop('blist had duplicated parameters!')
         if(is.list(nlist)){
-            nvec <- setNames(reshape2:::melt.list(nlist), c('block', 'nodeId'))
+            nvec <- setNames(melt(nlist), c('block', 'nodeId'))
         } else{
             nvec <- data.table(block=seq_along(nlist), nodeId=nlist)
         }
@@ -112,8 +112,9 @@ Block <- function(this.model, blist, mlist, nlist, group='components', lambda, p
 ##' @describeIn fitHurdle Fit an auto-model (Ising or Gaussian) to \code{samp} using glmnet.  checkpointDir is currently ignored.
 ##' @param nlambda number of lambda values on grid (default 200)
 ##' @param lambda.min.ratio minimum lambda ratio (as a function of lambda0, where the first predictor enters; default .1)
-##' @param family in the case of \code{autoLogistic} one of "gaussian" or "logistic"
-autoLogistic <- function(samp, fixed=NULL, parallel=FALSE, keepNodePaths=FALSE, checkpointDir, nlambda=200, lambda.min.ratio=.1, family='binomial'){
+##' @param family in the case of \code{autoGLM} one of "gaussian" or "logistic"
+##' @aliases autoLogistic
+autoGLM <- function(samp, fixed=NULL, parallel=FALSE, keepNodePaths=FALSE, checkpointDir, nlambda=200, lambda.min.ratio=.1, family='binomial'){
     samp0 <- if(family=='binomial') (abs(samp)>0)*1 else samp
     applyfun <- if(parallel) function(X, FUN) parallel::mclapply(X, FUN, mc.preschedule=TRUE) else lapply
     if(is.null(fixed)) fixed <- matrix(1, nrow=nrow(samp0))
@@ -137,21 +138,56 @@ autoLogistic <- function(samp, fixed=NULL, parallel=FALSE, keepNodePaths=FALSE, 
             path <- Matrix::Matrix( c(1, rep(0, ncol(model)-1)), nrow=1, sparse=TRUE)
         }
         rownames(path) <- net$lambda
-        res <- list(path=path, blocks=blk, lambda=net$lambda, df=net$df, nodeId=thisId)
+        refit <- refitGLMVector(path, model, samp0[,i], blk, family)
+        res <- list(path=path, blocks=blk, lambda=net$lambda, df=net$df, nodeId=thisId, path_np=refit$path_np, loglik_np=refit$loglik_np, nobs=nrow(samp))
         class(res) <- 'SolPath'
         res
     }))
-    arr <- neighborhoodToArray(result, vnames=colnames(samp))
+    arr <- neighborhoodToArray(result, vnames=colnames(samp), nobs=nrow(samp))
     if(keepNodePaths){
         return(structure(arr, timing=timing, nodePaths=result))
     }
     return(structure(arr, timing=timing))
 }
 
+##Legacy synonym
+autoLogistic <- autoGLM
+
+refitGLMVector <- function(path, this.model, y.zif, blocks, family, fuzz=0){
+    path_np = path
+    loglik_np = rep(99999999, nrow(path))
+    for(i in seq_len(nrow(path))){
+        activetheta <- which(abs(path[i,])>fuzz)
+        activemm <- unique(na.omit(blocks$map[list(paridx=activetheta),mmidx, on='paridx']))
+        refit <- glm.fit(this.model[,activemm,drop=FALSE], y.zif, family=do.call(family, list()))
+        path_np[i,activetheta] = refit$coef
+        loglik_np[i] = -refit$deviance/2
+    }
+    list(path_np=path_np, loglik_np=loglik_np)
+}
+
 accessDirOrDie <- function(dir){
     if(is.null(dir) || file_test("-d", dir)) return(TRUE)
     if(!dir.create(dir)) stop('Cannot create/access', dir)
     return(TRUE)
+}
+
+#' Center data so that it has conditional column mean zero
+#'
+#' @param samp matrix of data
+#' @return centered matrix
+#' @export
+#' @examples
+#' dat = data.frame(x=c(1:5, 0, 0, 0), y=c(6:10, 0, 0, 0))
+#' conditionalCenter(dat)
+#' #compare to
+#' scale(dat, scale=FALSE)
+conditionalCenter <- function(samp) {
+    apply(samp, 2, function(x) {
+        xI <- abs(x) > 0
+        x[xI] <- scale(x[xI], scale = FALSE)
+        x
+    })
 }
 
 ##' Fit the hurdle model coordinate-by-coordinate on a sample
@@ -191,7 +227,7 @@ fitHurdle <- function(samp, fixed=NULL, parallel=TRUE, keepNodePaths=FALSE, chec
         res
     }))
     
-    arr <- neighborhoodToArray(result, vnames=colnames(samp))
+    arr <- neighborhoodToArray(result, vnames=colnames(samp), nobs=nrow(samp))
     if(keepNodePaths){
         return(structure(arr, timing=timing, nodePaths=result))
     }
@@ -251,13 +287,13 @@ stability <- function(sample, fixed, stabIndex, step=seq_along(stabIndex), metho
 collectStability <- function(stabout, fdr=.02, stabilityCheckpointDir=NULL){
     if(!is.null(stabilityCheckpointDir)){
         chkfiles <- list.files(stabilityCheckpointDir, pattern='chk_s.*.rds', full.names=TRUE)
-        get <- function(i) readRDS(chkfiles[i])
+        Get <- function(i) readRDS(chkfiles[i])
         ni <- length(chkfiles)
     } else{
-        get <- function(i) stabout[[i]]
+        Get <- function(i) stabout[[i]]
         ni <- sum(!sapply(stabout, is.null))
     }
-    x1 <- get(1)
+    x1 <- Get(1)
     p <- ncol(x1$adjMat[[1]])
     iknot <- unique(sort(c(x1$trueEdges, floor(fdr*p^2))))
     e1 <- interpolateEdges(x1$adjMat, x1$lambda, knot=iknot)
@@ -267,7 +303,7 @@ collectStability <- function(stabout, fdr=.02, stabilityCheckpointDir=NULL){
     si <- 0
     for(i in seq_len(ni)){
         tt <- try({
-        xx <- get(i)
+        xx <- Get(i)
         ee <- interpolateEdges(xx$adjMat, xx$lambda, iknot)
         hasedge <- (abs(sparseCbind(ee$edgeInterp))>0)*1
         #print(sum(hasedge))

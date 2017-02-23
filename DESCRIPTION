@@ -23,10 +23,15 @@ Imports:
     Matrix,
     methods,
     stats,
-    utils
+    utils,
+    plyr
 Suggests:
     testthat,
-    parallel
+    parallel,
+    directlabels,
+    knitr,
+    rmarkdown
 LinkingTo: RcppArmadillo,
     Rcpp
 RoxygenNote: 5.0.1
+VignetteBuilder: knitr
