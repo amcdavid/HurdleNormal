@@ -1,5 +1,5 @@
 ## Quell warnings about missing imports from base packages
-##' @importFrom stats approx coef cor.test median na.omit optim optimize rnorm runif setNames var
+##' @importFrom stats approx coef cor.test median na.omit optim optimize rnorm runif setNames var glm.fit
 ##' @importFrom utils file_test
 ##' @importFrom methods new
 NULL
@@ -151,7 +151,7 @@ dHurdle210 <- function(x, G, H, K, tol=5e-2){
 rCondHurdle210 <- function(x, j, G, H, K, tol=5e-4){
     stopifnot(length(j) == 1 && ncol(x)  == ncol(G)-1)
     .checkArgs(G=G, H=H, K=K)
-    if(is.matrix(x)) aaply(x, 1, .rCondHurdle, j=j-1, G=G, H=H, K=K, tol=tol) else .rCondHurdle(x, j-1, G, H, K, tol)
+    if(is.matrix(x)) plyr::aaply(x, 1, .rCondHurdle, j=j-1, G=G, H=H, K=K, tol=tol) else .rCondHurdle(x, j-1, G, H, K, tol)
 }
 
 

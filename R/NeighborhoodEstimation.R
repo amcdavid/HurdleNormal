@@ -105,6 +105,7 @@ Block <- function(this.model, blist, mlist, nlist, group='components', lambda, p
     out
 }
 
+globalVariables(c('penalty.scale.lambda', 'paridx', 'mmidx', 'block'))
 
 ##' @export
 ##' @import data.table

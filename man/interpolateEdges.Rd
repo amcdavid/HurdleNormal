@@ -21,4 +21,3 @@ a list of `edgeInterp`: contains a list of length `nknot` of sparse adjacency ma
 \description{
 Interpolate set of adjacency matrix across a set of edges
 }
-

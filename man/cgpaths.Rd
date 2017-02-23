@@ -5,8 +5,8 @@
 \title{Get a solution path for the CG model}
 \usage{
 cgpaths(y.zif, this.model, Blocks = Block(this.model),
-  nodeId = NA_character_, nlambda = 100, lambda.min.ratio = if
-  (length(y.zif) < ncol(this.model)) 0.005 else 0.05, lambda,
+  nodeId = NA_character_, nlambda = 50, lambda.min.ratio = if
+  (length(y.zif) < ncol(this.model)) 0.01 else 0.15, lambda,
   penaltyFactor = "full", control = list(tol = 0.001, maxrounds = 300, debug
   = 1), theta)
 }
@@ -37,4 +37,3 @@ matrix of parameters, one row per lambda
 \description{
 Get a solution path for the CG model
 }
-

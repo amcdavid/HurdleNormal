@@ -4,19 +4,20 @@
 \alias{neighborhoodToArray}
 \title{Convert neighborhood estimates fit on differing lambda paths into adjacency matrices}
 \usage{
-neighborhoodToArray(pathList, nknots, vnames = NULL)
+neighborhoodToArray(pathList, nknots, nobs, vnames = NULL)
 }
 \arguments{
 \item{pathList}{a list of paths (coefficients in columns, paths in rows)}
 
 \item{nknots}{number of knots (points along solution path) to consider.}
 
+\item{nobs}{number of observations in data (used to calculate BIC)}
+
 \item{vnames}{a vector of names to be applied to the resulting adjacency matrix. The \code{nodeId} in each element in the \code{pathList} will be used if omitted.}
 }
 \value{
-list of (sparse) adjacency matrices, the number of non-zero elements for each matrix, and the lambda for each matrix.
+list of (sparse) adjacency matrices, the number of non-zero elements (edges, before enforcing symmetry) for each matrix, the lambda for each matrix, the non-penalized, refitted pseudo log-likelihood, the number of parameters per edge, and the BIC
 }
 \description{
 Join a series of paths fit node-wise into a list of adjacency matrices.
 }
-

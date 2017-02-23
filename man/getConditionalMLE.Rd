@@ -24,4 +24,3 @@ list of length two giving parameter values and standard errors. j is the index o
 \description{
 Loop over indices and solve condiiton MLE
 }
-

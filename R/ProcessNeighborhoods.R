@@ -66,7 +66,7 @@ neighborhoodToArray <- function(pathList, nknots, nobs, vnames=NULL){
     gridlist <- list()
     loglikmatrix <- matrix(0, nrow=P, ncol=length(lpath))
     safeApprox <- getSafeApprox(lpath)
-    for(i in seq_len(P)){
+    for(i in seq_along(pathList)){
         if(inherits(pathList[[i]], 'SolPath')){
             gridlist[[i]] <- interpolateSummarizeCoefs(pathList[[i]], safeApprox)
             llnp <- pathList[[i]]$loglik_np

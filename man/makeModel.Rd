@@ -31,4 +31,3 @@ design matrix, with attribute fixedCols giving indices of unpenalized intercept 
 \description{
 Generate a design matrix corresponding to the 2-1-0 hurdle
 }
-

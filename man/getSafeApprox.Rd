@@ -16,4 +16,3 @@ function of (x,y) providing the interpolations for x=lpath
 In the interior of x, interpolation is used, otherwise the value of y at the endpoint is used.
 Returns an empty list if length(x) = 0.
 }
-

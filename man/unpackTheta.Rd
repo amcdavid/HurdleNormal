@@ -17,4 +17,3 @@ ordered parameter
 \description{
 This just used to bridge between the R and C++ likelihood calcs, hence is legacy code now.
 }
-

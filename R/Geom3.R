@@ -1,7 +1,7 @@
 stat_hurdle2d <- function(mapping = NULL, data = NULL, geom = "line",
                        position = "identity", na.rm = FALSE, show.legend = NA, 
                        inherit.aes = TRUE,tol=.01, ...) {
-  layer(
+  ggplot2::layer(
     stat = StatHurdle2d, data = data, mapping = mapping, geom = geom, 
     position = position, show.legend = show.legend, inherit.aes = inherit.aes,
     params = list(na.rm = na.rm, tol=tol, ...)
@@ -40,7 +40,7 @@ StatHurdle1d <- ggplot2::ggproto("StatHurdle1d", ggplot2::Stat,
 stat_hurdle1d <- function(mapping = NULL, data = NULL, geom = "segment",
                        position = "identity", na.rm = FALSE, show.legend = NA, 
                        inherit.aes = TRUE,vars='x', tol=.01, ...) {
-  layer(
+  ggplot2::layer(
     stat = StatHurdle1d, data = data, mapping = mapping, geom = geom, 
     position = position, show.legend = show.legend, inherit.aes = inherit.aes,
     params = list(na.rm = na.rm, vars=vars, tol=tol, ...)
@@ -56,7 +56,7 @@ stat_hurdle1d <- function(mapping = NULL, data = NULL, geom = "segment",
 ##' @param size.point size of points in scatter plot
 ##' @param ... passed to stat_hurdle1d
 ##' @return plot
-##' @importFrom ggplot2 aes_string geom_rect ggplot scale_x_continuous scale_y_continuous geom_line geom_point
+##' @importFrom ggplot2 aes_string geom_rect ggplot scale_x_continuous scale_y_continuous geom_line geom_point aes
 ##' @export
 ggally_hurdle <- function(data, mapping, lwd.regression=1, lwd.axis=2, size.point=1, ...){
     p <- ggplot(data, mapping)+geom_point(size=size.point, ...)+stat_hurdle1d(vars='x', lwd=lwd.axis, color='red', ...)+stat_hurdle1d(vars='y', lwd=lwd.axis, color='red', ...)+stat_hurdle2d(lwd=lwd.regression, color='blue', ...)

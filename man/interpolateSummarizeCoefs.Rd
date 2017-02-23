@@ -17,4 +17,3 @@ data.table with columns `y` giving normed, interpolated values, `x` giving lamba
 \description{
 Interpolate a solution path using approxFun and reduce the coefficients in a block to their signed L2 norm
 }
-

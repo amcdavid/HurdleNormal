@@ -256,6 +256,7 @@ simulateHurdle210 <- function(N, p, dependence='G', structure='independence', st
     }
     hs <- HurdleStructure(G, H, K, gibbs=FALSE)
     if(!is.null(tweak)){
+        warning('Beware of crunchy code')
         hs <- tweakOffDiag(hs, lH0, lG0)
         jamPcor <- function(lH=lH0, lG=lG0){
             message('**lH= ', round(lH, 2), 'lG = ', round(lG, 2), '**')

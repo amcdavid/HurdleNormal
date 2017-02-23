@@ -45,4 +45,3 @@ In increasing abstraction, with variable prefixes in parenthesis:
 5. lambda -- penalties as a function of blocks.
 All of these components are provided in the `map`
 }
-

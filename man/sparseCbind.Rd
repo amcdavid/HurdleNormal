@@ -17,4 +17,3 @@ a Matrix, each column being a flattened matrix.
 \description{
 Recursively flatten and bind together sparse matrices
 }
-

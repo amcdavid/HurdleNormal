@@ -51,7 +51,7 @@ pathList <- lapply(seq_along(ngh), function (i){
 
 
 
-pathArray <- neighborhoodToArray(pathList)
+pathArray <- neighborhoodToArray(pathList, nobs = 10)
 test_that('pathList lambda range spans its members',{
     expect_equal(range(pathArray$lambda), range(do.call(c, lambdaList)))
 
@@ -141,11 +141,15 @@ test_that('True edges are monotone increasing', {
 })
 
 context("Non-penalized log-likelihood")
+is_increasing <- function(x, y, decreasing=FALSE){
+    o <- order(x, decreasing = decreasing)
+    expect_equivalent(y[o], sort(y, decreasing = decreasing))
+}
+
 test_that('Log-likelihood is non-increasing', {
-    ## Lambda is increasing for `fit`, hence loglik is decreasing
-    expect_equal(fit$pseudo_loglik_np, sort(fit$pseudo_loglik_np))
-    expect_equal(al$pseudo_loglik_np, sort(al$pseudo_loglik_np,  decreasing = TRUE))
-    expect_equal(al2$pseudo_loglik_np, sort(al2$pseudo_loglik_np,  decreasing = TRUE))
-    expect_equal(al3$pseudo_loglik_np, sort(al3$pseudo_loglik_np,  decreasing = TRUE))
-    expect_equal(al4$pseudo_loglik_np, sort(al4$pseudo_loglik_np,  decreasing = TRUE))
+    is_increasing(fit$lambda, -fit$pseudo_loglik_np)
+    is_increasing(al$lambda, -al$pseudo_loglik_np)
+    is_increasing(al2$lambda, -al2$pseudo_loglik_np)
+    is_increasing(al3$lambda, -al3$pseudo_loglik_np)
+    is_increasing(al4$lambda, -al4$pseudo_loglik_np)
 })

@@ -26,4 +26,3 @@ plot
 \description{
 Wrapper so ggally can use \code{geom_hurdle}
 }
-
