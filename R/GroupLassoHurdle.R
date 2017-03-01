@@ -9,7 +9,7 @@
 ##' (design matrix will still be centered, and orthogonal to indicators)
 ##' @param ... ignored
 ##' @param tol tolerance for declaring a parameter equal to zero
-##' @return design matrix, with attribute fixedCols giving indices of unpenalized intercept columns
+##' @return design matrix, with attribute fixedCols giving indices of unpenalized intercept columns. Each gene appears in adjacent columns with its continuous component first, followed by its binarization.
 ##' @export
 makeModel <- function(zif, nodeId, fixed=NULL, center=TRUE, scale=FALSE, conditionalCenter=TRUE, ..., tol=.001){
     nonZ <- abs(zif)>tol
@@ -83,7 +83,7 @@ projectEllipse <- function(v, lambda, d, u, control){
 ##' @importFrom Rcpp sourceCpp
 ##' @export
 cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_character_, nlambda=100, lambda.min.ratio=if(length(y.zif)<ncol(this.model)) .005 else .05, lambda, penaltyFactor='full', control=list(tol=1e-3, maxrounds=300, debug=1), theta){
-    defaultControl <- list(tol=1e-3, maxrounds=300, debug=1, stepcontract=.5, stepsize=1, stepexpand=.1, FISTA=FALSE, newton0=FALSE, safeRule=2)
+    defaultControl <- list(tol=1e-3, maxrounds=300, debug=1, stepcontract=.5, stepsize=1, stepexpand=.1, FISTA=FALSE, newton0=FALSE, safeRule=2, returnHessian=FALSE)
     nocontrol <- setdiff(names(defaultControl), names(control))
     control[nocontrol] <- defaultControl[nocontrol]
     penaltyFactor <- match.arg(penaltyFactor, c('full', 'diagonal', 'identity'))
@@ -283,7 +283,7 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
         ## update jerr?
     }
     
-    res <- list(path=Matrix::Matrix(out, sparse=TRUE), kktout=Matrix::Matrix(kktout, sparse=TRUE), flout=flout, blocks=Blocks, lambda=lambda, nodeId=nodeId)
+    res <- list(path=Matrix::Matrix(out, sparse=TRUE), kktout=Matrix::Matrix(kktout, sparse=TRUE), flout=flout, blocks=Blocks, lambda=lambda, nodeId=nodeId, hessian=if(control$returnHessian) hess else NULL)
     class(res) <- 'SolPath'
     res
 }
