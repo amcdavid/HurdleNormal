@@ -42,9 +42,12 @@ sparseCbind <- function(x, sparse=TRUE){
 ##'
 ##' Join a series of paths fit node-wise into a list of adjacency matrices.
 ##' @param pathList a list of paths (coefficients in columns, paths in rows)
+##' @param nknots number of lambda knots.  Be default, use the number of lambda in each neighborhood in pathList
 ##' @param vnames a vector of names to be applied to the resulting adjacency matrix
+##' @param summaryFun  a function summarizing the node-level interaction parameters.  Should be a function of the vector of interaction parameters and the nodeId that returns a single numeric value.
 ##' @return list of (sparse) adjacency matrices, the number of non-zero elements for each matrix, and the lambda for each matrix.
-neighborhoodToArray <- function(pathList, nknots, vnames=NULL){
+##' @export
+neighborhoodToArray <- function(pathList, nknots, vnames=NULL, summaryFun=summarySignedL1){
     lambdaRange <- t(sapply(pathList, function(x){
         lambda <- if('lambda' %in% names(x))  x$lambda else 0
         c(range=range(lambda), n=length(lambda))
@@ -66,7 +69,7 @@ neighborhoodToArray <- function(pathList, nknots, vnames=NULL){
     
     for(i in seq_len(P)){
         if(inherits(pathList[[i]], 'SolPath')){
-            gridlist[[i]] <- interpolateSummarizeCoefs(pathList[[i]], safeApprox)
+            gridlist[[i]] <- interpolateSummarizeCoefs(pathList[[i]], safeApprox, summaryFun)
         }
     }
     
@@ -109,10 +112,11 @@ getSafeApprox <- function(lpath){
 
 ##' Interpolate a solution path using approxFun and reduce the coefficients in a block to their signed L2 norm
 ##' @param sol solution (a list containing a sparse neighborhood matrix and the lambda over which it was evaluated)
-##' @param blk a data table mapping between columns of sol$path and nodes
 ##' @param approxFun a function interpolating or otherwise approximating the solution between nodes
+##' @param summaryFun a function summarizing the node-level interaction parameters.  Should be a function of the vector of interaction parameters and the nodeId that returns a single numeric value.
+##' @param blk a data table mapping between columns of sol$path and nodes
 ##' @return data.table with columns `y` giving normed, interpolated values, `x` giving lamba values and `block` giving the node in question
-interpolateSummarizeCoefs <- function(sol, approxFun){
+interpolateSummarizeCoefs <- function(sol, approxFun, summaryFun){
     ## mapping from parameters to blocks and nodes.  Only consider penalized blocks.
     blk <-  sol$blocks$map[lambda>0,.(paridx, nodeId)]
     ## path at node
@@ -123,10 +127,43 @@ interpolateSummarizeCoefs <- function(sol, approxFun){
     setnames(trip, c('j', 'x'), c('paridx', 'Coef'))
     trip <- merge(trip, blk, by='paridx')
     interpolate <- trip[,approxFun(x=lambda, y=Coef), keyby=list(paridx, nodeId)]
-    summarized <- interpolate[,list(y=mean(y^2)*sign(y[which.max(abs(y))]) ), keyby=list(x,nodeId)]
+    summarized <- interpolate[,list(y=summaryFun(y, nodeId)), keyby=list(x,nodeId)]
     summarized[,nodeId1:=sol$nodeId]
     summarized[abs(y)>0,]
 }
+
+summaryMaxL2 <- function(y, nodeId){
+    sqrt(mean(y^2))*sign(y[which.max(abs(y))])
+}
+
+summaryL2 <- function(y, nodeId){
+    sqrt(mean(y^2))
+}
+
+summarySignedL1 <- function(y, nodeId){
+    pospart <- sum(y[y>0])
+    negpart <- sum(-y[y<0])
+    if(pospart >= negpart) pospart else -negpart
+}
+
+summaryHij <- function(y, nodeId){
+    y[1]
+}
+
+summaryG <- function(y, nodeId){
+    y[2]
+}
+
+summaryK <- function(y, nodeId){
+    y[3]
+}
+
+summaryHji <- function(y, nodeId){
+    y[4]
+}
+
+
+
 
 toSparseTriples <- function(mat){
     if(!inherits(mat, 'sparseMatrix')){

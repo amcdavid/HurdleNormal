@@ -20,3 +20,17 @@ hushWarning <- function(expr, regexp){
         if(str_detect(conditionMessage(w), regexp)) invokeRestart("muffleWarning")
     })
 }
+
+
+##' Selectively convert a warnings to an error
+##'
+##' @param expr an expression
+##' @param regexp a regexp to be matched (with str_detect)
+##' @return the result of expr
+##' @import stringr
+##' @export
+promoteWarning <- function(expr, regexp){
+    withCallingHandlers(expr, warning=function(w){
+        if(str_detect(conditionMessage(w), regexp)) stop(conditionMessage(w))
+    })
+}
