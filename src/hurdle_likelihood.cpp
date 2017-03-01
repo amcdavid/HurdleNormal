@@ -3,6 +3,8 @@
 #include "assert.h"
 using namespace arma;
 
+const double HurdleLikelihood::large = 30;
+
 // [[Rcpp::depends(RcppArmadillo)]]
 HurdleLikelihood::HurdleLikelihood (const arma::vec& y_, const arma::mat& xd_, // const arma::mat& xc_, 
 				    const arma::ivec& grp_, const arma::vec& th, const arma::vec& lambda_, double tol)

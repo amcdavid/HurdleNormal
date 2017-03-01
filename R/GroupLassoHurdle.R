@@ -12,7 +12,7 @@
 ##' @return design matrix, with attribute fixedCols giving indices of unpenalized intercept columns. Each gene appears in adjacent columns with its continuous component first, followed by its binarization.
 ##' @export
 makeModel <- function(zif, nodeId, fixed=NULL, center=TRUE, scale=FALSE, conditionalCenter=TRUE, ..., tol=.001){
-    nonZ <- abs(zif)>tol
+    nonZ <- not_zero(zif, tol)
     if(conditionalCenter){
         for(i in seq_len(ncol(zif))){
             zifPos <- zif[nonZ[,i],i]
@@ -20,6 +20,7 @@ makeModel <- function(zif, nodeId, fixed=NULL, center=TRUE, scale=FALSE, conditi
         }
     }
     if(is.null(fixed)) fixed <- matrix(1, nrow=nrow(zif), ncol=1)
+    if(!is.matrix(fixed) && !is.numeric(fixed)) stop('`Fixed` must be a numeric matrix')
 
     ## for(i in seq_len(ncol(zif))){
     ##     cols <- seq(2*i-1, 2*i)
@@ -42,6 +43,9 @@ makeModel <- function(zif, nodeId, fixed=NULL, center=TRUE, scale=FALSE, conditi
 }
 
 
+not_zero <- function(x, tol=0){
+    abs(x)>tol   
+}
 
 ## Let K^{-1} = A^T A = U^T D U
 ## Solve
@@ -54,7 +58,7 @@ projectEllipse <- function(v, lambda, d, u, control){
     r=0
     error_r=sum(v^2/(d*r+lambda)^2)-1
     r_iter=0
-    while(abs(error_r)>=r_solve_thresh && r_iter<max_r_iters){
+    while(not_zero(error_r, r_solve_thresh) && r_iter<max_r_iters){
         r_iter=r_iter+1
         if(r_iter==max_r_iters){ warning("Linesearch iteration exceeded") }
         slope=2*sum(v^2*d/(d*r+lambda)^3)
@@ -71,19 +75,19 @@ projectEllipse <- function(v, lambda, d, u, control){
 ##' @param y.zif (zero-inflated) response
 ##' @param this.model model matrix used for both discrete and continuous linear predictors
 ##' @param Blocks output from \code{Block} giving the grouping/scaling for the penalization.
+##' @param nodeId optional labels for the nodes.  will be used to stitch to
 ##' @param nlambda if `lambda` is not provided, then the number of lambda to interpolate between
 ##' @param lambda.min.ratio if `lambda` is not provided, then the left end of the solution path as a function of the lambda0, the lambda for the empty model
 ##' @param lambda penalty path desired
 ##' @param penaltyFactor one of `full`, `diagonal` or `identity` giving how the penalty should be scaled \emph{blockwise}
 ##' @param control optimization control parameters
 ##' @param theta (optional) initial guess for parameter
-##' @param blocks object of Blocks giving blocking and block-specific penalization
 ##' @return matrix of parameters, one row per lambda
 ##' @useDynLib HurdleNormal
 ##' @importFrom Rcpp sourceCpp
 ##' @export
 cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_character_, nlambda=100, lambda.min.ratio=if(length(y.zif)<ncol(this.model)) .005 else .05, lambda, penaltyFactor='full', control=list(tol=1e-3, maxrounds=300, debug=1), theta){
-    defaultControl <- list(tol=1e-3, maxrounds=300, debug=1, stepcontract=.5, stepsize=1, stepexpand=.1, FISTA=FALSE, newton0=FALSE, safeRule=2, returnHessian=FALSE)
+    defaultControl <- list(tol=1e-3, maxrounds=300, debug=1, stepcontract=.5, stepsize=1, stepexpand=.1, FISTA=FALSE, newton0=FALSE, safeRule=2, returnHessian=FALSE, refit=TRUE)
     nocontrol <- setdiff(names(defaultControl), names(control))
     control[nocontrol] <- defaultControl[nocontrol]
     penaltyFactor <- match.arg(penaltyFactor, c('full', 'diagonal', 'identity'))
@@ -111,7 +115,7 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
         colnames(flout) <- c('converged', 'round', 'geval', 'feval', 'gamma', 'nnz')
         colnames(out) <- c(outer(1:p, c('D', 'C'),paste0), 'kbb')
         rownames(kktout) <- rownames(flout) <- rownames(out) <- lambda
-        return(list(path=out, kktout=kktout, flout=flout, blocks=Blocks, lambda=lambda, nodeId=nodeId))
+        return(list(path=out, kktout=kktout, flout=flout, blocks=Blocks, lambda=lambda, nodeId=nodeId, path_np=out, loglik_np=rep(999999999, length(lambda))))
 }
 
     ## get likelihood object
@@ -148,16 +152,12 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
     gamma <- control$stepsize
     
     ## value for empty sol
-    interceptCol <- Blocks$nonpenMM
-    interceptPar <- Blocks$nonpenpar
-    theta0 <- theta[interceptPar]
-    hl0 <- HurdleLikelihood(y.zif, this.model[,interceptCol,drop=FALSE], theta=theta0, lambda=0)
-    o <- optim(theta0, hl0$LLall, hl0$gradAll, penalize=FALSE, method='L-BFGS-B')
+    o <- refitModel(theta, this.model, y.zif, activetheta=Blocks$nonpenpar, Blocks)
     if(o$convergence !=0){
         warning('Empty solution failed to converge')
         return(emptySol(lambda))
     }
-    theta[interceptPar] <- o$par
+    theta[o$activetheta] <- o$par
 
     ## Hessian at empty solution
     sg <- getsg(theta)
@@ -245,21 +245,20 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
         return(emptySol(lambda))
     }
     if(missing(lambda)) lambda <- 10^seq(log10(1.01*l0), log10(l0*lambda.min.ratio), length.out=nlambda)
-
-    out <- matrix(0, nrow=length(lambda), ncol=length(theta))
+    
+    path_np <- out <- matrix(0, nrow=length(lambda), ncol=length(theta))
     ## kkt conditions
     kktout <- matrix(0, nrow=length(lambda), ncol=length(blocklist))
     ## diagnostic flags
     flout <- matrix(NA, nrow=length(lambda), ncol=6)
+    ## non-penalized log-likelihood
+    nloglik_np <- rep(NA_real_, length(lambda))
     colnames(flout) <- c('converged', 'round', 'geval', 'feval', 'gamma', 'nnz')
-    colnames(out) <- c(outer(1:p, c('D', 'C'),paste0), 'kbb')
-    rownames(kktout) <- rownames(flout) <- rownames(out) <- lambda
-
-
-    if(control$debug>1) message('grad block1 ', paste(hl0$gradAll(theta[interceptPar]), collapse=','))
-    
+    colnames(path_np) <- colnames(out) <- c(outer(1:p, c('D', 'C'),paste0), 'kbb')
+    names(nloglik_np) <- rownames(path_np) <- rownames(kktout) <- rownames(flout) <- rownames(out) <- lambda
 
     ## loop over lambda
+    refitted <- FALSE
     for(l in seq_along(lambda)){
         hl$setLambda(lambda[l])
         if(l>1){
@@ -273,6 +272,13 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
         gradblock <- attr(sp, 'gradblock')
         if(control$debug>0) message('Lambda = ', round(lambda[l], 3), ' rounds = ', attr(sp, 'flag')['round'], ' NNZ = ', attr(sp, 'flag')['nnz'], ' gamma = ', round(gamma, 3))
         activeset <- sum(kktout[l,]>0)
+        if(control$refit){
+            if(is.logical(refitted) || !all( not_zero(out[l-1,]) == not_zero(theta)) ){
+                refitted <- refitModel(theta, this.model, y.zif, blocks=Blocks, control=list(factr=1e9))
+            }
+            nloglik_np[l] = refitted$value
+            path_np[l,refitted$activetheta] = refitted$par
+        }
         if(activeset >= n/2){
             out <- out[1:l,,drop=FALSE]
             kktout <- kktout[1:l,,drop=FALSE]
@@ -280,12 +286,21 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
             l <- lambda[1:l]
             break
         }
-        ## update jerr?
     }
     
-    res <- list(path=Matrix::Matrix(out, sparse=TRUE), kktout=Matrix::Matrix(kktout, sparse=TRUE), flout=flout, blocks=Blocks, lambda=lambda, nodeId=nodeId, hessian=if(control$returnHessian) hess else NULL)
+    res <- list(path=Matrix::Matrix(out, sparse=TRUE), kktout=Matrix::Matrix(kktout, sparse=TRUE), flout=flout, blocks=Blocks, lambda=lambda, nodeId=nodeId, hessian=if(control$returnHessian) hess else NULL, path_np=Matrix::Matrix(path_np, sparse=TRUE), loglik_np=-nloglik_np*nrow(this.model), nobs=length(y.zif))
     class(res) <- 'SolPath'
     res
+}
+
+globalVariables(c('active'))
+
+refitModel <- function(theta, this.model, y.zif, activetheta, blocks, fuzz=0, control=list()){
+    if(missing(activetheta))  activetheta <- which(not_zero(theta, fuzz))
+    activemm = unique(na.omit(blocks$map[list(paridx=activetheta),mmidx, on='paridx']))
+    hl0 <- HurdleLikelihood(y.zif, this.model[,activemm,drop=FALSE], theta=theta[activetheta], lambda=0)
+    o <- optim(theta[activetheta], hl0$LLall, hl0$gradAll, penalize=FALSE, method='L-BFGS-B', control=control)
+    c(o, activetheta=list(activetheta))
 }
 
 ## .makeParams <- function(lambda, nlambda, theta, blocklist){
@@ -298,7 +313,6 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
 
 blockHessian <- function(theta, sg, Blocks, X, onlyActive=TRUE, control, fuzz=.1, hl, exact=FALSE){
     hess <- vector('list', length(Blocks))
-    #browser()
     hl$LLall(theta, penalize=FALSE)
     gpart <- hl$gpart()
     gplusc <- hl$gplusc()
@@ -360,7 +374,7 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
     }
     ## apparently indexing into gradblock is slow.
     bActive <- gradblock[active==TRUE,block]
-    while(round < control$maxrounds && any(abs(kkt[2,])>control$tol)){
+    while(round < control$maxrounds && any(not_zero(kkt[2,], control$tol))){
         round <- round+1
         for(b in bActive){
             ##apply proximal operator to block b
@@ -394,7 +408,7 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
         if(move) {
             if(control$FISTA){
                 omega <- mround/(mround+5)
-                browser(expr=round>100)
+                #browser(expr=round>100)
             ## accept proposed proximal point, and extrapolate
                 thetaTmp <- theta + omega*(theta-thetaPrime0)
                 thetaPrime0 <- thetaPrime1
@@ -449,6 +463,11 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
 
 
 
+
+#' Plot a solution path
+#'
+#' @param cgpaths result of \code{cgpaths}
+#' @importFrom ggplot2 scale_x_log10
 plotSolPath <- function(cgpaths){
     l2 <- sapply(cgpaths$blocks, function(b){
         rowSums(cgpaths$path[,b]^2)
@@ -462,6 +481,6 @@ plotSolPath <- function(cgpaths){
 })
 
     pathPlot <- ggplot(mp, aes(x=lambda, y=value, col=X2))+geom_line() + scale_x_log10()
-    direct.label(pathPlot, 'last.points')
+    directlabels::direct.label(pathPlot, 'last.points')
     invisible(l2)
 }

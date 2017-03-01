@@ -35,18 +35,27 @@ test_that('Can Generate with fixed columns', {
 
 
 context('Fit one penalized')
+is_increasing <- function(x, y, decreasing=FALSE){
+    o <- order(x, decreasing = decreasing)
+    expect_equivalent(y[o], sort(y, decreasing = decreasing))
+}
+
 test_that('Can fit', {
     y.zif <- rgh[,1]
     #this.model <- rgh[,-1,drop=FALSE]
     theta <- c(gbb=-10, 0, 0, hbb=10, 0, 0, 0, 0, 0, 0, 1)+.02
     names(theta) <- parmap(3)
     lambda <- c(2.8, 1, .8, .7, .6, .5, .3, .1, .1, .05, .05, .01, 0)
+    np_idx <- length(lambda)
     paths1 <- cgpaths(y.zif, this.model1, Block(this.model1), lambda=lambda, control=list(tol=5e-4, maxrounds=1000, debug=1, stepsize=1, stepexpand=.01, newton0=TRUE), penaltyFactor='full')
     expect_true(inherits(paths1, 'SolPath'))
+    is_increasing(paths1$lambda, -paths1$loglik_np)
     #paths2 <- cgpaths(y.zif, makeModel(rgh[,-1, drop=FALSE]), lambda=lambda, control=list(tol=1e-5, maxrounds=2000, debug=0, method='block'), standardize=FALSE)
-    hm <- HurdleLikelihood(y.zif, this.model1, theta=paths1$path[13,], lambda=0)
-    thetareg <- optim(paths1$path[13,], hm$LLall, hm$gradAll, method='L-BFGS-B', hessian=TRUE, control=list(pgtol=1-8, maxit=1e4, factr=1e5))
-    distreg <- (paths1$path[13,]-thetareg$par)
+    hm <- HurdleLikelihood(y.zif, this.model1, theta=paths1$path[np_idx,], lambda=0)
+    thetareg <- optim(paths1$path[np_idx,], hm$LLall, hm$gradAll, method='L-BFGS-B', hessian=TRUE, control=list(maxit=1e4, factr=1e11), penalize=FALSE)
+    distreg <- (paths1$path[np_idx,]-thetareg$par)
     manoblis <- crossprod(distreg, thetareg$hess) %*% distreg
-    expect_less_than(manoblis, sqrt(1e-6))
+    expect_equal(paths1$path_np[np_idx,], thetareg$par, tol=5e-2, check.attributes=FALSE)
+    expect_equal(paths1$loglik_np[np_idx], -thetareg$value*length(y.zif), tol=1e-1, check.attributes=FALSE)
+    expect_lt(manoblis, sqrt(1e-6))
 })

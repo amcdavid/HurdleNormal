@@ -17,4 +17,3 @@ the result of expr
 \description{
 Selectively muffle warnings based on output
 }
-

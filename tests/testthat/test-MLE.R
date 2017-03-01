@@ -19,33 +19,33 @@ set.seed(1234)
 test_that('Converge under independence', {
     checkGrad(Indep)
     err <- getLimit(Indep)
-    expect_false(any(diff(err)>0))
+    expect_false(any(t(diff(err))>err[3,]))
 })
 
 
 test_that('Converge under K dependence', {
     checkGrad(Kdep2)
     err <- getLimit(Kdep2)
-    expect_false(any(diff(err)>0))
+    expect_false(any(t(diff(err))>err[3,]))
 })
 
 test_that('Converge under G dependence', {
     checkGrad(Gdep)
     err <- getLimit(Gdep)
-    expect_false(any(diff(err)>0))
+    expect_false(any(t(diff(err))>err[3,]))
 
 })
 
 test_that('Converge under Hupper dependence', {
     checkGrad(Hupdep)
     err <- getLimit(Hupdep)
-    expect_false(any(diff(err)>0))
+    expect_false(any(t(diff(err))>err[3,]))
 })
 
 test_that('Converge under Hlower dependence', {
     checkGrad(Hlodep)
     err <- getLimit(Hlodep)
-    expect_false(any(diff(err)>0))
+    expect_false(any(t(diff(err))>err[3,]))
 
 })
 

@@ -8,7 +8,7 @@
 
 class HurdleLikelihood {
  private:
-  static const double large=30;
+  static const double large;
  public:
   arma::vec y, yI; 			// response
   arma::mat xd;//, xc;			// design matrix, assumed to be in group order

@@ -1,4 +1,4 @@
-Indep <- HurdleStructure(G=-13*diag(3), H=diag(3)*5, K=diag(3))
+Indep <- HurdleStructure(G=-13*diag(3), H=diag(3)*5, K=diag(3), gibbs=FALSE)
 Gdep <- Indep
 Gdep$true$G[1,2] <- Gdep$true$G[2,1] <- 1.5
 Kdep1 <- Indep
@@ -6,31 +6,33 @@ Kdep1$true$K[1,2] <- Kdep1$true$K[2,1] <- -.7
 Kdep2 <- Kdep1
 Kdep2$true$H[1,2] <- Kdep2$true$H[2,1] <- -2.25
 Hupdep <- Indep
-Hupdep$true$H[1,2] <- 1.5
-Hupdep$true$G[2,2] <- Hupdep$true$G[1,1] <- -18.5
+Hupdep$true$H[1,2] <- 1
+Hupdep$true$G[2,2] <- Hupdep$true$G[1,1] <- -16
 Hlodep <- Indep
-Hlodep$true$H[2,1] <- 1.5
-Hlodep$true$G[2,2] <- Hlodep$true$G[1,1] <- -18.5
+Hlodep$true$H[2,1] <- 1
+Hlodep$true$G[2,2] <- Hlodep$true$G[1,1] <- -17
+thin <- .01
+diag(Indep$true$G) <- -12.5
 
-Indep <- getGibbs(Indep)
-Gdep <- getGibbs(Gdep)
-Kdep2 <- getGibbs(Kdep2)
-Hupdep <- getGibbs(Hupdep)
-Hlodep <- getGibbs(Hlodep)
+Indep <- getGibbs(Indep, thin=thin)
+Gdep <- getGibbs(Gdep, thin=thin)
+Kdep2 <- getGibbs(Kdep2, thin=thin)
+Hupdep <- getGibbs(Hupdep, thin=thin)
+Hlodep <- getGibbs(Hlodep, thin=thin)
 
 
 library(plyr)
 library(nloptr)
 getLimit <- function(hs, engine='R'){
-    thin=.1
     burnin=1000
-    series <- c(50, 250, 1250)
+    series <- c(100, 400, 2000)
     fitseries <- matrix(NA, nrow=length(series), ncol=3)
     colnames(fitseries) <- c("G", "H", "K")
     for(i in seq_along(series)){
         sub <- series[i]
         n <- sub/thin+burnin
         hs <- suppressMessages(getGibbs(hs, Nt=n, burnin=burnin, thin=thin))
+        #hs$gibbs <- addPseudoCounts(hs$gibbs)
         fit <- getConditionalMLE(hs, testGrad=TRUE, engine=engine) 
         gj <- getJoint(fit)
         err <- sapply(c('G', 'H', 'K'), function(i) sum((hs$true[[i]]-gj[[i]])^2))

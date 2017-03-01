@@ -1,3 +1,9 @@
+## Quell warnings about missing imports from base packages
+##' @importFrom stats approx coef cor.test median na.omit optim optimize rnorm runif setNames var glm.fit
+##' @importFrom utils file_test
+##' @importFrom methods new
+NULL
+
 expit <- function(x) exp(x)/(1+exp(x))
 logit <- function(x) log(x/(1-x))
 
@@ -47,7 +53,7 @@ dHurdle210 <- function(x, G, H, K, tol=5e-2){
     x <- as.matrix(do.call(expand.grid, limitli))
     dx <- do.call(expand.grid, dxli)
     prodDx <- apply(dx, 1, prod)
-    feval <- aaply(x, 1, fun, ...)*prodDx
+    feval <- plyr::aaply(x, 1, fun, ...)*prodDx
     dim(feval) <- c(sapply(limitli, length))
     dimnames(feval) <- limitli
     list(feval=feval, breaks=limitli)
@@ -98,7 +104,7 @@ dHurdle210 <- function(x, G, H, K, tol=5e-2){
         subH <- t(crossprod(bits, H))[bits,,drop=F]      #H order is wrong throughout, since 1y is supposed to be a selector, eg eq 6?  Can we fix by inverting 6?
         submu <- cov %*% subH
         mu[bits,i] <- submu
-        N[i] <- .5*(t(subH) %*% submu -  determinant(subK/(2*pi), log=TRUE)$modulus)
+        N[i] <- .5*(t(subH) %*% submu -  determinant(subK/(2*pi), logarithm=TRUE)$modulus)
         logP[i] <- sum(G[bits, bits]) + N[i]
         if(!log) N[i] <- exp(N[i])
 
@@ -145,7 +151,7 @@ dHurdle210 <- function(x, G, H, K, tol=5e-2){
 rCondHurdle210 <- function(x, j, G, H, K, tol=5e-4){
     stopifnot(length(j) == 1 && ncol(x)  == ncol(G)-1)
     .checkArgs(G=G, H=H, K=K)
-    if(is.matrix(x)) aaply(x, 1, .rCondHurdle, j=j-1, G=G, H=H, K=K, tol=tol) else .rCondHurdle(x, j-1, G, H, K, tol)
+    if(is.matrix(x)) plyr::aaply(x, 1, .rCondHurdle, j=j-1, G=G, H=H, K=K, tol=tol) else .rCondHurdle(x, j-1, G, H, K, tol)
 }
 
 
@@ -174,6 +180,26 @@ rv <- function(x){
 ##     t(matrix(samp, nrow=p))[-seq_len(burnin),]
 ## }
 
+
+#' Sample from a multivariate hurdle model
+#'
+#' Nt 
+#' @param G symmetric discrete interaction matrix
+#' @param H unstructured location matrix
+#' @param K Symmetric positive definite conditional precision matrix
+#' @param Nt Number of unthinned samples, including burnin
+#' @param burnin how many samples to discard from burn in
+#' @param thin how many samples to thin
+#' @param tol Numeric tolerance for zero
+#' @return matrix of (Nt-burnin)*thin samples
+#' @export
+#' @examples
+#' G = matrix(c(-15, 1, 0,
+#' 1, -15, 1.5,
+#' 0, 1.5, -15), nrow=3)
+#' H = diag(5, nrow=3)
+#' K = diag(1, nrow=3)
+#' y = rGibbsHurdle(G, H, K, 2000, thin = .2, burnin=1000)
 rGibbsHurdle <- function(G, H, K, Nt, burnin=floor(Nt/2), thin=1, tol=5e-4){
     p <- ncol(G)
     .checkArgs(matrix(ncol=p), G, H, K)

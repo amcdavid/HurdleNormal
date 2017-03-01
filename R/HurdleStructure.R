@@ -1,4 +1,4 @@
-HurdleStructure <- function(G=NULL, H=NULL, K=NULL, sample=NULL, gibbs=TRUE, estimate=NULL){
+HurdleStructure <- function(G=NULL, H=NULL, K=NULL, sample=NULL, gibbs=TRUE, estimate=NULL, gibbs_args=list(kcell=1)){
     if(!is.null(G)){
         .checkArgs(G=G, H=H, K=K)
     } else if(!is.null(sample) || !is.null(gibbs)){
@@ -12,7 +12,8 @@ HurdleStructure <- function(G=NULL, H=NULL, K=NULL, sample=NULL, gibbs=TRUE, est
         stop('Empty constructor')
     }
     true <- list(G=G, H=H, K=K)
-    if(isTRUE(gibbs)) gibbs <- getGibbs(list(true=true))$gibbs
+    if(isTRUE(gibbs)) gibbs <- do.call(getGibbs, list(hs=list(true=true, gibbs_args=gibbs_args)))$gibbs
+    
 
     trueFactor <- sign(K)+2^sign(H)+4^sign(G)
     Kt <- signToChar(K, 'K')
@@ -22,7 +23,7 @@ HurdleStructure <- function(G=NULL, H=NULL, K=NULL, sample=NULL, gibbs=TRUE, est
     trueFactor <- matrix(trueFactor, nrow=nrow(G))
     trueChar <- matrix(trueChar, nrow=nrow(G))
 
-    li <- list(true=true, sample=sample, gibbs=gibbs, estimate=estimate, norm=NULL, trueFactor=trueFactor, trueChar=trueChar)
+    li <- list(true=true, sample=sample, gibbs=gibbs, estimate=estimate, norm=NULL, trueFactor=trueFactor, trueChar=trueChar, gibbs_args=gibbs_args)
     class(li) <- c('list', 'HurdleStructure')
     li
 }
@@ -50,11 +51,24 @@ getNormalizing <- function(hs, subsample=Inf){
 
 getGibbs <- function(hs, Nt=2000, ...){
     if(!is.null(hs$gibbs)) message("Replacing gibbs sample")
-    gibbs <- with(hs$true, rGibbsHurdle(G, H, K, Nt=Nt, ...))
+    kcell = hs$gibbs_args$kcell
+    gibbs <- with(hs$true, rGibbsHurdle(G, H, K, Nt=Nt*kcell, ...))
+    ##gibbs <- with(hs$true, rGibbsHurdle(G, H, K, Nt=Nt, ...))
     ct <- cor.test(gibbs[-1,1], gibbs[-nrow(gibbs),
                                   1], conf.level=.99)$conf.int[1]
-    if(!is.na(ct) && ct >.1) warning('Significant auto correlation found')
+    if(!is.na(ct) && ct >.1){
+        warning('Significant auto correlation found')
+        }
     hs$gibbs <- gibbs
+    if(kcell>1){
+    cellnum <- rep(seq_len(floor(nrow(gibbs)/kcell)), length.out=nrow(gibbs))
+    gibbs <- do.call(rbind, tapply(seq_len(nrow(gibbs)), cellnum, function(i) log2(colMeans(2^gibbs[i,,drop=FALSE]))))
+    }
+    if(is.function(post_fun <- hs$gibbs_args$post_fun)){
+         hs$gibbs <- post_fun(gibbs)
+    } else{
+        hs$gibbs <- gibbs   
+    }
     
     hs
 }
@@ -66,8 +80,10 @@ getDensity <- function(hs, ...){
 
 
 ##' Convert from old style to new style parameter vector or vice versa
+##'
+##' This just used to bridge between the R and C++ likelihood calcs, hence is legacy code now.
 ##' @param theta parameter vector
-##' @param unpack if TRUE convert from old style to new, else convert from new to old
+##' @param method \code{character} one of 'unpack', 'pack', or 'gradient'
 ##' @return ordered parameter
 unpackTheta <- function(theta, method='unpack'){
     p <- (length(theta)-3)/4+1
@@ -119,6 +135,8 @@ wrapGradAll <- function(hl, theta, penalize){
 ##'
 ##' @param hs HurdleStructure
 ##' @param using 'gibbs' or 'sample'
+##' @param testGrad Should we check the gradient for convergence.
+##' @param engine \code{character}.  If `R` then the R likelihood/gradient will be used. Else C++.
 ##' @param ... passed to optim
 ##' @return list of length two giving parameter values and standard errors. j is the index of the response, i is the index of the coefficient.
 ##' @export
@@ -172,10 +190,10 @@ momentChar <- function(hs, v){
 }
 
 getJoint <- function(fit){
-    C <- lapply(cast(fit$Parm, i~j | par), function(x) as.matrix(x[,-1]))
+    C <- lapply(reshape::cast(fit$Parm, i~j | par), function(x) as.matrix(x[,-1]))
     G <- C$gba
     diag(G) <- diag(C$gbb)
-    H <- C$hba + t(C$hab)
+    H <- (C$hba + t(C$hab))/2
     diag(H) <- diag(C$hbb)
     K <- C$kba
     diag(K) <- diag(C$kbb)
@@ -185,10 +203,10 @@ getJoint <- function(fit){
 }
 
 
-simulateHurdle210 <- function(N, p, dependence='G', structure='independence', structureArgs=list(sparsity=.1, groupwise=FALSE), intensityArgs=list(G=1, Hupper=1, Hlower=1, K=-.3, gamma=1), Gdiag=-14, Hdiag=5, Kdiag=1, tweak=NULL, tweakArgs=list(lH0=4, lG0 =2)){
+## Used to simulate Erdos-Renyi networks
+simulateHurdle210 <- function(N, p, dependence='G', structure='independence', structureArgs=list(sparsity=.1, groupwise=FALSE), intensityArgs=list(G=1, Hupper=1, Hlower=1, K=-.3, gamma=1), Gdiag=-14, Hdiag=5, Kdiag=1, gibbs_args){
     dependence <- match.arg(dependence, c('G', 'Hupper', 'Hlower', 'K'), several.ok=TRUE)
     structure <- match.arg(structure, c('independence', 'sparse', 'chain'))
-    if(!is.null(tweak)) tweak <- match.arg(tweak, c("G", "GH"))
     Hlower <- Hupper <- diag(Hdiag, p)/2
     K <- diag(Kdiag, p)/2
     G <- matrix(0, p, p)
@@ -220,57 +238,9 @@ simulateHurdle210 <- function(N, p, dependence='G', structure='independence', st
     H <- Hupper + t(Hlower)
     G <- G+t(G)
     diag(G) <- Gdiag
-    tweakmat <- G
-    if(!is.null(tweak)){
-        if(tweak=='GH') tweakmat <- K
-        lH0 <- tweakArgs[['lH0']]
-        lG0 <- tweakArgs[['lG0']]
-    } else{
-        lG0 <- lH0 <- 0
-    }
-    knz <- abs(tweakmat)>0
-    knz <- knz & t(knz)
-    diag(knz) <- FALSE
-    anynz <- abs(K) |abs(G)>0 | abs(H)>0
-    diag(anynz) <- FALSE
 
-    tweakOffDiag <- function(HS, lH, lG){
-        HS$true$H[knz] <- lH*tweakmat[knz]
-        if(!is.null(tweak) && tweak=='GH'){
-            HS$true$G[knz] <- lG*tweakmat[knz]
-        }
-        HS <- suppressWarnings(getGibbs(HS))
-        margins <- round(colMeans(abs(HS$gibbs)>0), 2)
-        message(paste(margins, collapse=','))
-        G <- HS$true$G
-        message('Before: ', paste(round(diag(G), 2), collapse=','))
-        diag(G) <- diag(G)-log((margins+.01)/(1.01-margins))
-        message('After: ', paste(round(diag(G),2), collapse=','))
-        HS$true$G <- G
-        HS
-    }
-    hs <- HurdleStructure(G, H, K, gibbs=FALSE)
-    if(!is.null(tweak)){
-        hs <- tweakOffDiag(hs, lH0, lG0)
-        jamPcor <- function(lH=lH0, lG=lG0){
-            message('**lH= ', round(lH, 2), 'lG = ', round(lG, 2), '**')
-            hs <- tweakOffDiag(hs, lH, lG)
-            rho <- as.matrix(pcor.shrink(hs$gibbs, lambda=.15))
-            diag(rho) <- 0
-            obj <- sum( (2*anynz-1)*abs(rho))
-            message('--obj=', obj, '--')
-            obj
-        }
-        O2 <- optimize(jamPcor, c(-2, lH0+3), tol=.15, lG=lG0)
-        lH0 <- O2$min
-        if(tweak=='GH'){
-            O <- optimize(jamPcor, c(-lG0-1, lG0), tol=.15, lH=lG0)
-            lG0 <- O$min
-        }
-        message('lH=', lH0, 'lG= ', lG0)
-        hs <- tweakOffDiag(hs, lH0, lG0)
-    }
-    hs <- getGibbs(hs, N/.1+2000, burnin=2000, thin=.1)
+    hs <- HurdleStructure(G, H, K, gibbs=FALSE, gibbs_args=gibbs_args)
+    hs <- getGibbs(hs, N*10+2000, burnin=2000, thin=.1)
     margins <- colMeans(abs(hs$gibbs)>0)
     message(paste(margins, collapse=','))
     hs

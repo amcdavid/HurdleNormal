@@ -29,4 +29,3 @@ Return a sample from f(x_i | x_{-i}), that is, a sample of the conditional distr
 \code{x} is assumed in the same order as the parameter vectors, aside from its missing ith element.
 This function is vectorized over x.
 }
-

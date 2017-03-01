@@ -1,8 +1,8 @@
 setClass("HurdleLikelihood", representation(pointer = "externalptr", p='integer'))
 
 HurdleLikelihood_method <- function(name) {
-paste( "HurdleLikelihood", name, sep = "__" )
- }
+    paste( "HurdleLikelihood", name, sep = "__" )
+}
 
 validateTheta <- function(theta, p){
     stopifnot(length(theta)==2*p+1)
@@ -37,8 +37,13 @@ HurdleLikelihood_setLambda <- function(x, lambda){
 
 
 
-## syntactic sugar to allow object$method( ... )
-setMethod( "$", "HurdleLikelihood", function(x, name ) {
+##' Internal functions
+##' 
+##' Man page for internal functions
+##' @param x \code{HurdleLikelihood} class
+##' @param name C++ method to call
+##' @return depends
+setMethod( "$", "HurdleLikelihood", function(x, name='LLall') {
     if(name == 'gradAll'){
         function(theta, penalize=TRUE){
             if(missing(theta)){

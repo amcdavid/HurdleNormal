@@ -43,14 +43,15 @@ pathList <- lapply(seq_along(ngh), function (i){
     gamma <- matrix(rep(c(0, seq(0, 1, length.out=nl-1)), times=length(ngh)), ncol=nl, byrow=T)
     ## path
     blk <- Block(blist=list(1, 2, 3, 4), nlist=nlists[[i]])
-    res <- list(path=Matrix::Matrix(t(ngh[[i]]*gamma), sparse=T), lambda=ll, blocks=blk, nodeId=colnames(rgh)[i])
+    path = Matrix::Matrix(t(ngh[[i]]*gamma), sparse=T)
+    res <- list(path=path, lambda=ll, blocks=blk, nodeId=colnames(rgh)[i],  path_np=path*1.1, loglik_np=2-ll)
     class(res) <- "SolPath"
     res
 })
 
 
 
-pathArray <- neighborhoodToArray(pathList)
+pathArray <- neighborhoodToArray(pathList, nobs = 10)
 test_that('pathList lambda range spans its members',{
     expect_equal(range(pathArray$lambda), range(do.call(c, lambdaList)))
 
@@ -75,24 +76,24 @@ test_that('pathList coincides with pathArray', {
             l <- pl$lambda[ipath]            
             llo <- which(pal<l)
             arrayLess <- testSlice(llo, ipath, i)
-            expect_more_than(length(setdiff(arrayLess[[1]], arrayLess[[2]])), -0.1)
+            expect_gt(length(setdiff(arrayLess[[1]], arrayLess[[2]])), -0.1)
 
             lhi <- which(pal>l)
             arrayMore <- testSlice(llo, ipath, i)
-            expect_more_than(length(setdiff(arrayMore[[2]], arrayMore[[1]])), -0.1)
+            expect_gt(length(setdiff(arrayMore[[2]], arrayMore[[1]])), -0.1)
         }
     }
 
 })
 
-fit <- fitHurdle(rgh, FALSE, makeModelArgs=list(scale=FALSE, conditionalCenter=TRUE, center=TRUE), returnNodePaths=TRUE, nlambda=10, penalty='full', control=list(tol=5e-2, newton0=TRUE, debug=0))
-al <- autoLogistic(rgh, nlambda=50, lambda.min.ratio=.01)
+fit <- fitHurdle(rgh, parallel=FALSE, makeModelArgs=list(scale=FALSE, conditionalCenter=TRUE, center=TRUE), keepNodePaths=TRUE, nlambda=10, penalty='full', control=list(tol=5e-2, newton0=TRUE, debug=0))
+al <- autoGLM(rgh, nlambda=50, lambda.min.ratio=.01)
 ## irrelevant fixed predictor
-al2 <- autoLogistic(rgh, fixed=cbind(1, fixedeff=rnorm(nrow(rgh))), family='gaussian',  nlambda=5, lambda.min.ratio=.1, returnNodePaths=TRUE)
+al2 <- autoGLM(rgh, fixed=cbind(1, fixedeff=rnorm(nrow(rgh))), family='gaussian',  nlambda=5, lambda.min.ratio=.1, keepNodePaths=TRUE)
 ## no fixed
-al3 <- autoLogistic(rgh, family='gaussian',  nlambda=5, lambda.min.ratio=.1)
+al3 <- autoGLM(rgh, family='gaussian',  nlambda=5, lambda.min.ratio=.1)
 ## relevant fixed
-al4 <- autoLogistic(rgh, fixed=cbind(1, fixedeff=rgh[,4]+rnorm(nrow(rgh))/5), family='gaussian',  nlambda=5, lambda.min.ratio=.1)
+al4 <- autoGLM(rgh, fixed=cbind(1, fixedeff=rgh[,4]+rnorm(nrow(rgh))/5), family='gaussian',  nlambda=5, lambda.min.ratio=.1)
 
 test_that('Inherit from SolPath', {
         expect_true(inherits(attr(al2, 'nodePaths')[[1]], 'SolPath'))
@@ -107,7 +108,7 @@ test_that('Fixed columns appear in paths', {
 
 test_that("Including irrelevant fixed columns doesn't change adjacency (much)", {
     for(i in seq_along(al2$adjMat)){
-        expect_less_than(mean((al2$adjMat[[i]]-al3$adjMat[[i]])^2), .01)
+        expect_lt(mean((al2$adjMat[[i]]-al3$adjMat[[i]])^2), .01)
     }
 })
 
@@ -130,5 +131,25 @@ test_that('True edges are monotone increasing', {
     
     ie <- interpolateEdges(al2$adjMat, al2$lambda, nknot=5)
     expect_equal(ie$trueEdges, sort(ie$trueEdges, dec=TRUE))
+    
+    ie <- interpolateEdges(al3$adjMat, al3$lambda)
+    expect_equal(ie$trueEdges, sort(ie$trueEdges, dec=TRUE))
+    
+    ie <- interpolateEdges(al4$adjMat, al4$lambda)
+    expect_equal(ie$trueEdges, sort(ie$trueEdges, dec=TRUE))
 
+})
+
+context("Non-penalized log-likelihood")
+is_increasing <- function(x, y, decreasing=FALSE){
+    o <- order(x, decreasing = decreasing)
+    expect_equivalent(y[o], sort(y, decreasing = decreasing))
+}
+
+test_that('Log-likelihood is non-increasing', {
+    is_increasing(fit$lambda, -fit$pseudo_loglik_np)
+    is_increasing(al$lambda, -al$pseudo_loglik_np)
+    is_increasing(al2$lambda, -al2$pseudo_loglik_np)
+    is_increasing(al3$lambda, -al3$pseudo_loglik_np)
+    is_increasing(al4$lambda, -al4$pseudo_loglik_np)
 })

@@ -13,7 +13,8 @@ test_that('unpack is inverse of pack', {
 test_that('Cpp: Converge under independence', {
     checkGrad(Indep, engine='cpp')
     err <- getLimit(Indep, engine='cpp')
-    expect_false(any(diff(err)>0))
+    ## error is monotone (within tolerance defined by final error)
+    expect_false(any(t(diff(err))>err[3,]))
 })
 
 ## test_that('Unpenalized likelihood matches', {
@@ -30,26 +31,27 @@ test_that('Cpp: Converge under independence', {
 test_that('Cpp: Converge under K dependence', {
     checkGrad(Kdep2, engine='cpp')
     err <- getLimit(Kdep2, engine='cpp')
-    expect_false(any(diff(err)>0))
+    expect_false(any(t(diff(err))>err[3,]))
 })
 
 test_that('Cpp: Converge under G dependence', {
     checkGrad(Gdep, engine='cpp')
     err <- getLimit(Gdep, engine='cpp')
-    expect_false(any(diff(err)>0))
+    expect_false(any(t(diff(err))>err[3,]))
 
 })
 
 test_that('Cpp: Converge under Hupper dependence', {
     checkGrad(Hupdep, engine='cpp')
     err <- getLimit(Hupdep, engine='cpp')
-    expect_false(any(diff(err)>0))
+    expect_false(any(t(diff(err))>err[3,]))
 })
 
 test_that('Cpp: Converge under Hlower dependence', {
     checkGrad(Hlodep, engine='cpp')
     err <- getLimit(Hlodep, engine='cpp')
-    expect_false(any(diff(err)>0))
+    #browser()
+    expect_false(any(t(diff(err))>err[3,]))
 
 })
 

@@ -40,22 +40,10 @@ test_that('Conditional sampler for G dependence', {
     expect_equal(p11, ynz, tolerance=10/sqrt(EA))
 })
 
-test_that('Higher order conditional sampler', {
-    G <- matrix(c(2, 1, 1,
-                  1,-2, 1,
-                  1, 1, -2), nrow=3)
-    H <- matrix(c(5, -1, -1,
-                  -1, 2, -1,
-                  -1, -1, 2), nrow=3)
-    K <- diag(3)
-    x <- matrix(rep(c(0, EPS), each=200), nrow=200)
-    y <- rCondHurdle210(x, 3, G, H, K, tol=EPS/2)
-})
-
 context('Gibbs approximates joint')
 test_that('Marginals for Gdep', {
     set.seed(1234)
-    Gdep <- getGibbs(Gdep)
+    Gdep <- getGibbs(Gdep, thin=.1)
     samp <- Gdep$gibbs
     df <- data.frame(samp, nz=abs(samp)>.05)
     ## compare 2d contour plots to 2d density estimate
@@ -72,7 +60,7 @@ test_that('Marginals for Gdep', {
 
     
     suppressWarnings(gibbs1d <- chisq.test(table(cut(df$X1, breaks=c(f$q, max(f$q)+EPS), right=FALSE)), p=f$f))
-    expect_more_than(gibbs1d$p.value, .05)
+    expect_gt(gibbs1d$p.value, .05)
 })
 
 ## test condition distributions for non-zero terms, including offset
@@ -90,21 +78,18 @@ adjustedCondDistr <- function(hs){
 }
 
 test_that('Conditionals for Hlowdep', {
-    Hlowdep <- getGibbs(Hlowdep)
+    Hlowdep <- getGibbs(Hlowdep, thin=.1)
     testslow <- adjustedCondDistr(Hlowdep)
     ## 1 given 2 should have no binary dependence
     ## but yes LS dependence
     ## g12 both coef null
     expect_true(all(abs(testslow[1,3:4])<2))
     ## g21 continuous sig
-    expect_more_than(testslow[2,3],2)
+    expect_gt(testslow[2,3],2)
     ## binary not
-    expect_less_than(abs(testslow[2,4]),2)
-    Hupdep <- getGibbs(Hupdep)
+    expect_lt(abs(testslow[2,4]),2)
+    Hupdep <- getGibbs(Hupdep, thin=.1)
     testshi <- adjustedCondDistr(Hupdep)    
 })
 
-test_that('Probabilities match', {
-    
 
-})

@@ -26,4 +26,3 @@ breaks (lattice points)
 \description{
 Evaluate a Riemann sum on a grid of points that includes zero
 }
-
