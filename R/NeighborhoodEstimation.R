@@ -206,6 +206,7 @@ conditionalCenter <- function(samp) {
 fitHurdle <- function(samp, fixed=NULL, parallel=TRUE, keepNodePaths=FALSE, checkpointDir=NULL, makeModelArgs=NULL,  indices, ...){
     applyfun <- if(parallel) function(X, FUN) parallel::mclapply(X, FUN, mc.preschedule=FALSE) else lapply
     allindices <- seq_len(ncol(samp))
+    if(is.null(colnames(samp))) colnames(samp) <- seq_len(ncol(samp))
     indices <- if(missing(indices))  allindices else indices
     if(length(setdiff(indices, allindices))>0) stop('`indices` out of range')
     accessDirOrDie(checkpointDir)
