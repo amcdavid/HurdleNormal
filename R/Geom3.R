@@ -1,7 +1,7 @@
 stat_hurdle2d <- function(mapping = NULL, data = NULL, geom = "line",
                        position = "identity", na.rm = FALSE, show.legend = NA, 
                        inherit.aes = TRUE,tol=.01, ...) {
-  layer(
+  ggplot2::layer(
     stat = StatHurdle2d, data = data, mapping = mapping, geom = geom, 
     position = position, show.legend = show.legend, inherit.aes = inherit.aes,
     params = list(na.rm = na.rm, tol=tol, ...)
@@ -40,7 +40,7 @@ StatHurdle1d <- ggplot2::ggproto("StatHurdle1d", ggplot2::Stat,
 stat_hurdle1d <- function(mapping = NULL, data = NULL, geom = "segment",
                        position = "identity", na.rm = FALSE, show.legend = NA, 
                        inherit.aes = TRUE,vars='x', tol=.01, ...) {
-  layer(
+  ggplot2::layer(
     stat = StatHurdle1d, data = data, mapping = mapping, geom = geom, 
     position = position, show.legend = show.legend, inherit.aes = inherit.aes,
     params = list(na.rm = na.rm, vars=vars, tol=tol, ...)
@@ -96,7 +96,7 @@ ggally_hmosaic <- function(data, mapping, ...){
   alldata[[nm2]] <- rep(dimnames(jointTable)[[2]],nrow(jointTable))
 
   p <- ggplot(alldata, aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)) + 
-    geom_rect(color="black", aes_string(fill=nm1)) + scale_x_continuous(breaks=NULL)+scale_y_continuous(breaks=NULL)# +
+    geom_rect(color="black", fill='lightgrey') + scale_x_continuous(breaks=NULL)+scale_y_continuous(breaks=NULL)# +
     #xlab(paste(xvar, "(count)")) + ylab(paste(yvar, "(proportion)"))
     p$type <- 'continuous'
     p$subType <- 'hmosaic'
