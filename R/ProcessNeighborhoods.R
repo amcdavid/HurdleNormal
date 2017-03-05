@@ -47,7 +47,7 @@ sparseCbind <- function(x, sparse=TRUE){
 ##' @param vnames a vector of names to be applied to the resulting adjacency matrix. The \code{nodeId} in each element in the \code{pathList} will be used if omitted.
 ##' @return list of (sparse) adjacency matrices, the number of non-zero elements (edges, before enforcing symmetry) for each matrix, the lambda for each matrix, the non-penalized, refitted pseudo log-likelihood, the number of parameters per edge, and the BIC
 ##' @export
-neighborhoodToArray <- function(pathList, nknots, vnames=NULL, summaryFun=summarySignedL1){
+neighborhoodToArray <- function(pathList, nknots, vnames=NULL, summaryFun=summarySignedL1, nobs, self_edges=FALSE){
     lambdaRange <- t(sapply(pathList, function(x){
         lambda <- if('lambda' %in% names(x))  x$lambda else 0
         c(range=range(lambda), n=length(lambda))
@@ -69,7 +69,7 @@ neighborhoodToArray <- function(pathList, nknots, vnames=NULL, summaryFun=summar
     safeApprox <- getSafeApprox(lpath)
     for(i in seq_along(pathList)){
         if(inherits(pathList[[i]], 'SolPath')){
-            gridlist[[i]] <- interpolateSummarizeCoefs(pathList[[i]], safeApprox, summaryFun)
+            gridlist[[i]] <- interpolateSummarizeCoefs(pathList[[i]], safeApprox, summaryFun, self_edges)
             llnp <- pathList[[i]]$loglik_np
             loglikmatrix[i,] <- safeApprox(pathList[[i]]$lambda, llnp, yright=llnp[1])$y
         }
@@ -107,6 +107,9 @@ neighborhoodToArray <- function(pathList, nknots, vnames=NULL, summaryFun=summar
 getSafeApprox <- function(lpath){
     fun <- function(x, y, yright=0){
         lx <- length(x)
+        if(sum(!is.na(y))<2 && lx >= 2 ){           #approx errors out with less than two non-NA values ...
+            return(list(x=lpath, y=rep(NA_real_, length(lpath))))
+        }
         if(lx>0){
             approx(x, y, lpath, rule=2, yright=yright, method=ifelse(lx<2, 'constant', 'linear'))
         } else{
@@ -122,9 +125,10 @@ getSafeApprox <- function(lpath){
 ##' @param summaryFun a function summarizing the node-level interaction parameters.  Should be a function of the vector of interaction parameters and the nodeId that returns a single numeric value.
 ##' @param blk a data table mapping between columns of sol$path and nodes
 ##' @return data.table with columns `y` giving normed, interpolated values, `x` giving lamba values and `block` giving the node in question
-interpolateSummarizeCoefs <- function(sol, approxFun, summaryFun){
+interpolateSummarizeCoefs <- function(sol, approxFun, summaryFun, self_edges){
     ## mapping from parameters to blocks and nodes.  Only consider penalized blocks.
-    blk <-  sol$blocks$map[lambda>0,.(paridx, nodeId)]
+    #blk <-  sol$blocks$map[lambda>0,.(paridx, nodeId)]
+    blk <-  sol$blocks$map[,.(paridx, nodeId)]
     ## path at node
     lambda <- sol$lambda
     trip <- toSparseTriples(sol$path)
@@ -135,6 +139,11 @@ interpolateSummarizeCoefs <- function(sol, approxFun, summaryFun){
     interpolate <- trip[,approxFun(x=lambda, y=Coef), keyby=list(paridx, nodeId)]
     summarized <- interpolate[,list(y=summaryFun(y, nodeId), npar=.N), keyby=list(x,nodeId)]
     summarized[,nodeId1:=sol$nodeId]
+    if(self_edges){
+        summarized[nodeId=='(fixed)', nodeId:=sol$nodeId]
+    } else{
+        summarized <- summarized[nodeId!='(fixed)']
+    }
     summarized[abs(y)>0,]
 }
 
@@ -153,19 +162,26 @@ summarySignedL1 <- function(y, nodeId){
 }
 
 summaryHij <- function(y, nodeId){
-    y[1]
+    ## intercept of th_c (second block) or first value of th_d
+    ## Fixme (maybe) in makeModel
+    if(nodeId=='(fixed)') y[2] else y[1]
 }
 
 summaryG <- function(y, nodeId){
-    y[2]
+    ## intercept of th_d (first block) or second value of th_d
+    ## Fixme (maybe) in makeModel
+    if(nodeId=='(fixed)') y[1] else y[2]
 }
 
 summaryK <- function(y, nodeId){
+    ## precision or first value of th_c
+    ## Fixme (maybe) in makeModel
     y[3]
 }
 
 summaryHji <- function(y, nodeId){
-    y[4]
+    ## intercept of th_c 
+    if(nodeId=='(fixed)') y[2] else y[4]
 }
 
 
