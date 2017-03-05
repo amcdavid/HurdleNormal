@@ -44,7 +44,9 @@ sparseCbind <- function(x, sparse=TRUE){
 ##' @param pathList a list of paths (coefficients in columns, paths in rows)
 ##' @param nknots number of lambda knots.  Be default, use the number of lambda in each neighborhood in pathList
 ##' @param vnames a vector of names to be applied to the resulting adjacency matrix
-##' @param vnames a vector of names to be applied to the resulting adjacency matrix. The \code{nodeId} in each element in the \code{pathList} will be used if omitted.
+##' @param summaryFun function to reduce a vector-valued parameter set at each node to a scalar (representing an edge weight).  Defaults to the "signed" L2 norm.
+##' @param nobs number of observations the model was fit; used to calculate BIC
+##' @param self_edges should self edges (loops) be returned in the adjacency matrix; this allows inference of intercept quantities.
 ##' @return list of (sparse) adjacency matrices, the number of non-zero elements (edges, before enforcing symmetry) for each matrix, the lambda for each matrix, the non-penalized, refitted pseudo log-likelihood, the number of parameters per edge, and the BIC
 ##' @export
 neighborhoodToArray <- function(pathList, nknots, vnames=NULL, summaryFun=summarySignedL1, nobs, self_edges=FALSE){
@@ -119,11 +121,10 @@ getSafeApprox <- function(lpath){
     return(fun)
 }
 
-##' Interpolate a solution path using approxFun and reduce the coefficients in a block to their signed L2 norm
-##' @param sol solution (a list containing a sparse neighborhood matrix and the lambda over which it was evaluated)
+##' Interpolate a solution path using approxFun and reduce the coefficient vector in a block to a scalar
+##' @param sol a SolPath solution
 ##' @param approxFun a function interpolating or otherwise approximating the solution between nodes
-##' @param summaryFun a function summarizing the node-level interaction parameters.  Should be a function of the vector of interaction parameters and the nodeId that returns a single numeric value.
-##' @param blk a data table mapping between columns of sol$path and nodes
+##' @inheritParams neighborhoodToArray
 ##' @return data.table with columns `y` giving normed, interpolated values, `x` giving lamba values and `block` giving the node in question
 interpolateSummarizeCoefs <- function(sol, approxFun, summaryFun, self_edges){
     ## mapping from parameters to blocks and nodes.  Only consider penalized blocks.

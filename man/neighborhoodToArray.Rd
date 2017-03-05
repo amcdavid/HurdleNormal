@@ -14,7 +14,11 @@ neighborhoodToArray(pathList, nknots, vnames = NULL,
 
 \item{vnames}{a vector of names to be applied to the resulting adjacency matrix}
 
-\item{vnames}{a vector of names to be applied to the resulting adjacency matrix. The \code{nodeId} in each element in the \code{pathList} will be used if omitted.}
+\item{summaryFun}{function to reduce a vector-valued parameter set at each node to a scalar (representing an edge weight).  Defaults to the "signed" L2 norm.}
+
+\item{nobs}{number of observations the model was fit; used to calculate BIC}
+
+\item{self_edges}{should self edges (loops) be returned in the adjacency matrix; this allows inference of intercept quantities.}
 }
 \value{
 list of (sparse) adjacency matrices, the number of non-zero elements (edges, before enforcing symmetry) for each matrix, the lambda for each matrix, the non-penalized, refitted pseudo log-likelihood, the number of parameters per edge, and the BIC

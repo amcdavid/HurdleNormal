@@ -2,22 +2,22 @@
 % Please edit documentation in R/ProcessNeighborhoods.R
 \name{interpolateSummarizeCoefs}
 \alias{interpolateSummarizeCoefs}
-\title{Interpolate a solution path using approxFun and reduce the coefficients in a block to their signed L2 norm}
+\title{Interpolate a solution path using approxFun and reduce the coefficient vector in a block to a scalar}
 \usage{
 interpolateSummarizeCoefs(sol, approxFun, summaryFun, self_edges)
 }
 \arguments{
-\item{sol}{solution (a list containing a sparse neighborhood matrix and the lambda over which it was evaluated)}
+\item{sol}{a SolPath solution}
 
 \item{approxFun}{a function interpolating or otherwise approximating the solution between nodes}
 
-\item{summaryFun}{a function summarizing the node-level interaction parameters.  Should be a function of the vector of interaction parameters and the nodeId that returns a single numeric value.}
+\item{summaryFun}{function to reduce a vector-valued parameter set at each node to a scalar (representing an edge weight).  Defaults to the "signed" L2 norm.}
 
-\item{blk}{a data table mapping between columns of sol$path and nodes}
+\item{self_edges}{should self edges (loops) be returned in the adjacency matrix; this allows inference of intercept quantities.}
 }
 \value{
 data.table with columns `y` giving normed, interpolated values, `x` giving lamba values and `block` giving the node in question
 }
 \description{
-Interpolate a solution path using approxFun and reduce the coefficients in a block to their signed L2 norm
+Interpolate a solution path using approxFun and reduce the coefficient vector in a block to a scalar
 }
