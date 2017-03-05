@@ -1,0 +1,50 @@
+---
+title: "Simulations"
+author: "Andrew McDavid"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    toc_float: yes
+---
+
+# Scenarios
+## Graphs
+We simulate from:
+
+1.  Chain graphs of varying dimensions
+2.  A subgraph of reported gene-gene interactions from E Coli
+
+## Generative distributions
+We consider subclasses of the graphical hurdle model, and moderate departures from the class.
+
+1.  Full hurdle model
+2.  Logistic only
+3.  (1) contaminated with a scaled $t_8$ distribution
+4.  A synthetic "1000" cell dataset, comprised of models 1-2
+
+## Estimators
+1.  Graphical hurdle
+2.  Neighborhood selection with $\ell_1$-penalized logistic regression
+3.  Neighborhood selection with $\ell_1$-penalized linear regression
+4.  Neighborhood selection with $\ell_1$-penalized linear regression using a Gaussian Copula (non-paranormal)
+5.  Mutual information-based (ARACNE etc, use netbenchmark)
+
+## Evaluation
+1. False positives/negatives with oracle tuning
+2. False positives/negatives with BIC-based tuning
+
+```{r library}
+library(HurdleNormal)
+source('simulation_library.R')
+```
+
+```{r ecoli}
+set.seed(5678)
+vertex_seq <- sample(1565, size=500)
+options(mc.cores=6)
+gnw <- ecoli_genenetweaver(vertex_seq=vertex_seq)
+```
+
+

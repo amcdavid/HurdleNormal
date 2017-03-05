@@ -2,3 +2,5 @@
 #*#
 .Rhistory
 inst/doc
+.DS_Store
+.emacs.desktop
