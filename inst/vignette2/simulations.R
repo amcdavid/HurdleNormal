@@ -1,4 +1,6 @@
+devtools::load_all('../..')
 source('simulation_library.R')
+ecoli_gnw <- readRDS('ecoli_network.rds')
 writeModels <- TRUE
 fitModels <- TRUE
 Pseq <- c(16, 32, 64, 128)
@@ -18,13 +20,12 @@ for(i in seq_len(nrow(modelArgs))){
     } else if(thismodel=='dense'){
         modelList[[i]] <- HurdleNormal:::simulateHurdle210(N=thisN, thisP, c('G', 'Hupper', 'Hlower', 'K'), structure='chain', structureArgs=list(sparsity=thisSparsity), intensityArgs=list(G=-.25,K=-.4, Hupper=-.75, Hlower=-.75), Gdiag=-.5, Hdiag=1, gibbs_args=list(kcell=kcell, post_fun=contam))
     } else if(thismodel=='ecoli'){
-        
+        ecoli_gnw$gibbs_args <- list(kcell=kcell, post_fun=contam)
+        modelList[[i]] <- getGibbs(ecoli_gnw, Nt=thisN*10+1000)
     } else{
         stop('bad model name')
     }
-    }
 }
-
 
 if(writeModels){
     modelArgs <- rbind(modelArgs, addnArgs)
