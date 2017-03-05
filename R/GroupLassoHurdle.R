@@ -295,16 +295,16 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
 
 globalVariables(c('active'))
 
-refitModel <- function(theta, this.model, y.zif, activetheta, blocks, fuzz=0, control=list()){
+refitModel <- function(theta_, this.model, y.zif, activetheta, blocks, fuzz=0, control=list()){
     m <- blocks$map
     if(missing(activetheta)){
-        m[,theta:=theta]
+        m[,theta:=theta_]
         activeblocks <- m[,.(active=any(not_zero(theta, fuzz))), keyby=block]
-        activetheta <- m[activeblocks[active==TRUE],paridx,on='block']
+        activetheta <- sort(m[activeblocks[active==TRUE,],paridx,on='block'])
         }
-    activemm = unique(na.omit(blocks$map[list(paridx=activetheta),mmidx, on='paridx']))
-    hl0 <- HurdleLikelihood(y.zif, this.model[,activemm,drop=FALSE], theta=theta[activetheta], lambda=0)
-    o <- optim(theta[activetheta], hl0$LLall, hl0$gradAll, penalize=FALSE, method='L-BFGS-B', control=control)
+    activemm = sort(unique(na.omit(blocks$map[list(paridx=activetheta),mmidx, on='paridx'])))
+    hl0 <- HurdleLikelihood(y.zif, this.model[,activemm,drop=FALSE], theta=theta_[activetheta], lambda=0)
+    o <- optim(theta_[activetheta], hl0$LLall, hl0$gradAll, penalize=FALSE, method='L-BFGS-B', control=control)
     c(o, activetheta=list(activetheta))
 }
 
