@@ -4,12 +4,16 @@
 \alias{interpolateSummarizeCoefs}
 \title{Interpolate a solution path using approxFun and reduce the coefficients in a block to their signed L2 norm}
 \usage{
-interpolateSummarizeCoefs(sol, approxFun)
+interpolateSummarizeCoefs(sol, approxFun, summaryFun, self_edges)
 }
 \arguments{
 \item{sol}{solution (a list containing a sparse neighborhood matrix and the lambda over which it was evaluated)}
 
 \item{approxFun}{a function interpolating or otherwise approximating the solution between nodes}
+
+\item{summaryFun}{a function summarizing the node-level interaction parameters.  Should be a function of the vector of interaction parameters and the nodeId that returns a single numeric value.}
+
+\item{blk}{a data table mapping between columns of sol$path and nodes}
 }
 \value{
 data.table with columns `y` giving normed, interpolated values, `x` giving lamba values and `block` giving the node in question

@@ -26,7 +26,7 @@ makeModel(zif, nodeId, fixed = NULL, center = TRUE, scale = FALSE,
 \item{tol}{tolerance for declaring a parameter equal to zero}
 }
 \value{
-design matrix, with attribute fixedCols giving indices of unpenalized intercept columns
+design matrix, with attribute fixedCols giving indices of unpenalized intercept columns. Each gene appears in adjacent columns with its continuous component first, followed by its binarization.
 }
 \description{
 Generate a design matrix corresponding to the 2-1-0 hurdle

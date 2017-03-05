@@ -4,14 +4,15 @@
 \alias{neighborhoodToArray}
 \title{Convert neighborhood estimates fit on differing lambda paths into adjacency matrices}
 \usage{
-neighborhoodToArray(pathList, nknots, nobs, vnames = NULL)
+neighborhoodToArray(pathList, nknots, vnames = NULL,
+  summaryFun = summarySignedL1, nobs, self_edges = FALSE)
 }
 \arguments{
 \item{pathList}{a list of paths (coefficients in columns, paths in rows)}
 
-\item{nknots}{number of knots (points along solution path) to consider.}
+\item{nknots}{number of lambda knots.  Be default, use the number of lambda in each neighborhood in pathList}
 
-\item{nobs}{number of observations in data (used to calculate BIC)}
+\item{vnames}{a vector of names to be applied to the resulting adjacency matrix}
 
 \item{vnames}{a vector of names to be applied to the resulting adjacency matrix. The \code{nodeId} in each element in the \code{pathList} will be used if omitted.}
 }
