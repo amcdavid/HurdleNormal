@@ -296,7 +296,12 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
 globalVariables(c('active'))
 
 refitModel <- function(theta, this.model, y.zif, activetheta, blocks, fuzz=0, control=list()){
-    if(missing(activetheta))  activetheta <- which(not_zero(theta, fuzz))
+    m <- blocks$map
+    if(missing(activetheta)){
+        m[,theta:=theta]
+        activeblocks <- m[,.(active=any(not_zero(theta, fuzz))), keyby=block]
+        activetheta <- m[activeblocks[active==TRUE],paridx,on='block']
+        }
     activemm = unique(na.omit(blocks$map[list(paridx=activetheta),mmidx, on='paridx']))
     hl0 <- HurdleLikelihood(y.zif, this.model[,activemm,drop=FALSE], theta=theta[activetheta], lambda=0)
     o <- optim(theta[activetheta], hl0$LLall, hl0$gradAll, penalize=FALSE, method='L-BFGS-B', control=control)
@@ -446,7 +451,7 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
                     st <- theta[blocklist[[b]]]
                     lambda*sqrt(crossprod(st, hess[[b]]) %*% st)
                 })
-                print(noquote(paste0('penll=', round(LLall(thetaPrime1, penalize=FALSE) + sum(pen), 5), ' theta= ', paste(round(thetaPrime1, 2), collapse=','), 'gamma= ', sprintf('%2.2e', gamma))))
+                message(noquote(paste0('penll=', round(LLall(thetaPrime1, penalize=FALSE) + sum(pen), 5), ' theta= ', paste(round(thetaPrime1, 2), collapse=','), 'gamma= ', smessagef('%2.2e', gamma))))
                 debugval$thisll[round] <- LLall(thetaPrime1, FALSE)+sum(pen)
            }
             if(control$debug>2){
