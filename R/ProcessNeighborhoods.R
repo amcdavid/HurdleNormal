@@ -57,8 +57,9 @@ neighborhoodToArray <- function(pathList, nknots, vnames=NULL, summaryFun=summar
                             ))
     lambdaRange <- lambdaRange[lambdaRange[,'n']>3,]
     nsol <- if(missing(nknots)) floor(max(log10(length(pathList)), 1)*median(lambdaRange[,'n'], na.rm=TRUE)) else nknots
-    lmin <- min(lambdaRange[,'range1'], na.rm=TRUE)
-    lmax <- max(lambdaRange[,'range2'], na.rm=TRUE)
+    if(is.na(nsol)) nsol <- 2
+    lmin <- min(lambdaRange[,'range1'], 1e6, na.rm=TRUE)
+    lmax <- max(lambdaRange[,'range2'], 1e-6, na.rm=TRUE)
     lpath <- exp(seq(log(lmin), log(lmax), length.out=nsol))
     if(is.null(vnames)){
         vnames <- sapply(pathList, '[[', 'nodeId')
@@ -69,11 +70,14 @@ neighborhoodToArray <- function(pathList, nknots, vnames=NULL, summaryFun=summar
     gridlist <- list()
     loglikmatrix <- matrix(0, nrow=P, ncol=length(lpath))
     safeApprox <- getSafeApprox(lpath)
+    safeApproxPath <- function(x, y) safeApprox(x, y, yright=0)
     for(i in seq_along(pathList)){
         if(inherits(pathList[[i]], 'SolPath')){
-            gridlist[[i]] <- interpolateSummarizeCoefs(pathList[[i]], safeApprox, summaryFun, self_edges)
+            gridlist[[i]] <- interpolateSummarizeCoefs(pathList[[i]], safeApproxPath, summaryFun, self_edges)
             llnp <- pathList[[i]]$loglik_np
-            loglikmatrix[i,] <- safeApprox(pathList[[i]]$lambda, llnp, yright=llnp[1])$y
+            ## Take previous loglik on path as lower bound
+            ## Needed especially when lambda is disjoint for some coordinates
+            loglikmatrix[i,] <- safeApprox(pathList[[i]]$lambda, llnp, method='constant', f=1)$y
         }
     }
     
@@ -107,15 +111,18 @@ neighborhoodToArray <- function(pathList, nknots, vnames=NULL, summaryFun=summar
 ##' @param lpath grid of points over which interpolation is required
 ##' @return function of (x,y) providing the interpolations for x=lpath
 getSafeApprox <- function(lpath){
-    fun <- function(x, y, yright=0){
-        lx <- length(x)
+    fun <- function(x, y, method, ...){
+        lx <- length(unique(x))
         if(sum(!is.na(y))<2 && lx >= 2 ){           #approx errors out with less than two non-NA values ...
             return(list(x=lpath, y=rep(NA_real_, length(lpath))))
         }
         if(lx>0){
-            approx(x, y, lpath, rule=2, yright=yright, method=ifelse(lx<2, 'constant', 'linear'))
+            if(missing(method)){
+                method <- ifelse(lx<2, 'constant', 'linear')
+            }
+            return(approx(x, y, lpath, rule=2, method=method, ...))
         } else{
-            list(x=numeric(0), y=numeric(0))
+            return(list(x=numeric(0), y=numeric(0)))
         }
     }
     return(fun)
