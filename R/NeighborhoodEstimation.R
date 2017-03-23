@@ -116,6 +116,7 @@ globalVariables(c('penalty.scale.lambda', 'paridx', 'mmidx', 'block'))
 ##' @param family in the case of \code{autoGLM} one of "gaussian" or "logistic"
 ##' @aliases autoLogistic
 autoGLM <- function(samp, fixed=NULL, parallel=FALSE, keepNodePaths=FALSE, checkpointDir, nlambda=200, lambda.min.ratio=.1, family='binomial'){
+    if(is.null(colnames(samp))) colnames(samp) <- seq_len(ncol(samp))
     samp0 <- if(family=='binomial') (abs(samp)>0)*1 else samp
     applyfun <- if(parallel) function(X, FUN) parallel::mclapply(X, FUN, mc.preschedule=TRUE) else lapply
     if(is.null(fixed)) fixed <- matrix(1, nrow=nrow(samp0))
@@ -162,7 +163,11 @@ refitGLMVector <- function(path, this.model, y.zif, blocks, family, fuzz=0){
         activemm <- unique(na.omit(blocks$map[list(paridx=activetheta),mmidx, on='paridx']))
         refit <- glm.fit(this.model[,activemm,drop=FALSE], y.zif, family=do.call(family, list()))
         path_np[i,activetheta] = refit$coef
-        loglik_np[i] = -refit$deviance/2
+
+        p <- refit$rank
+        if (family %in% c("gaussian", "Gamma", "inverse.gaussian")) 
+            p <- p + 1
+        loglik_np[i] <- p - refit$aic/2
     }
     list(path_np=path_np, loglik_np=loglik_np)
 }
