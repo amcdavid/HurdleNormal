@@ -86,8 +86,8 @@ projectEllipse <- function(v, lambda, d, u, control){
 ##' @useDynLib HurdleNormal
 ##' @importFrom Rcpp sourceCpp
 ##' @export
-cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_character_, nlambda=100, lambda.min.ratio=if(length(y.zif)<ncol(this.model)) .005 else .05, lambda, penaltyFactor='full', control=list(tol=1e-3, maxrounds=300, debug=1), theta){
-    defaultControl <- list(tol=1e-3, maxrounds=300, debug=1, stepcontract=.5, stepsize=1, stepexpand=.1, FISTA=FALSE, newton0=FALSE, safeRule=2, returnHessian=FALSE, refit=TRUE)
+cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_character_, nlambda=50, lambda.min.ratio=if(length(y.zif)<ncol(this.model)) .005 else .05, lambda, penaltyFactor='full', control=list(tol=5e-3, maxrounds=300, debug=1), theta){
+    defaultControl <- list(tol=5e-3, maxrounds=300, debug=1, stepcontract=.5, stepsize=1, stepexpand=.1, FISTA=FALSE, newton0=FALSE, safeRule=2, returnHessian=FALSE, refit=TRUE)
     nocontrol <- setdiff(names(defaultControl), names(control))
     control[nocontrol] <- defaultControl[nocontrol]
     penaltyFactor <- match.arg(penaltyFactor, c('full', 'diagonal', 'identity'))
