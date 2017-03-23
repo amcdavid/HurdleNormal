@@ -4,7 +4,8 @@
 \alias{rGibbsHurdle}
 \title{Sample from a multivariate hurdle model}
 \usage{
-rGibbsHurdle(G, H, K, Nt, burnin = floor(Nt/2), thin = 1, tol = 5e-04)
+rGibbsHurdle(G, H, K, Nt, burnin = 500, thin = 0.1, tol = 5e-04,
+  Nkeep = 500)
 }
 \arguments{
 \item{G}{symmetric discrete interaction matrix}
@@ -20,12 +21,14 @@ rGibbsHurdle(G, H, K, Nt, burnin = floor(Nt/2), thin = 1, tol = 5e-04)
 \item{thin}{how many samples to thin}
 
 \item{tol}{Numeric tolerance for zero}
+
+\item{Nkeep}{(optional) number of samples, post-burnin and thinning}
 }
 \value{
 matrix of (Nt-burnin)*thin samples
 }
 \description{
-Nt
+Sample from a multivariate hurdle model
 }
 \examples{
 G = matrix(c(-15, 1, 0,

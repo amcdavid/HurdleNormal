@@ -5,9 +5,9 @@
 \title{Get a solution path for the CG model}
 \usage{
 cgpaths(y.zif, this.model, Blocks = Block(this.model),
-  nodeId = NA_character_, nlambda = 100, lambda.min.ratio = if
+  nodeId = NA_character_, nlambda = 50, lambda.min.ratio = if
   (length(y.zif) < ncol(this.model)) 0.005 else 0.05, lambda,
-  penaltyFactor = "full", control = list(tol = 0.001, maxrounds = 300, debug
+  penaltyFactor = "full", control = list(tol = 0.005, maxrounds = 300, debug
   = 1), theta)
 }
 \arguments{

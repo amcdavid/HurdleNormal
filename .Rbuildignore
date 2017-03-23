@@ -1,3 +1,5 @@
 .emacs.desktop
 die.R
 ^data-raw$
+^.*\.Rproj$
+^\.Rproj\.user$
