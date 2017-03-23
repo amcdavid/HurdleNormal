@@ -183,7 +183,6 @@ rv <- function(x){
 
 #' Sample from a multivariate hurdle model
 #'
-#' Nt 
 #' @param G symmetric discrete interaction matrix
 #' @param H unstructured location matrix
 #' @param K Symmetric positive definite conditional precision matrix
@@ -191,6 +190,7 @@ rv <- function(x){
 #' @param burnin how many samples to discard from burn in
 #' @param thin how many samples to thin
 #' @param tol Numeric tolerance for zero
+#' @param Nkeep (optional) number of samples, post-burnin and thinning
 #' @return matrix of (Nt-burnin)*thin samples
 #' @export
 #' @examples
@@ -200,10 +200,15 @@ rv <- function(x){
 #' H = diag(5, nrow=3)
 #' K = diag(1, nrow=3)
 #' y = rGibbsHurdle(G, H, K, 2000, thin = .2, burnin=1000)
-rGibbsHurdle <- function(G, H, K, Nt, burnin=floor(Nt/2), thin=1, tol=5e-4){
+rGibbsHurdle <- function(G, H, K, Nt, burnin=500, thin=.1, tol=5e-4, Nkeep=500){
     p <- ncol(G)
     .checkArgs(matrix(ncol=p), G, H, K)
     ## coords X samples
+    if(!missing(Nkeep)){
+        if(!missing(Nt)) stop("Provide only one of `Nt` and `Nkeep`")
+        Nt <- (Nkeep)*round(1/thin) + burnin
+    }
+    if(burnin>Nt) stop("More burnin samples than total samples!")
     tmat <- .rGibbsHurdle(G, H, K, Nt, tol)
     mat <- t(tmat)[-seq_len(burnin),]
     keep <- seq(from=1, to=nrow(mat), by=round(1/thin))
