@@ -137,6 +137,13 @@ ecoli_genenetweaver <- function(N_vertex=Inf, vertex_seq, Hdiag=0, Gdiag=0, Kdia
     hs
 }
 
+process_aracne <- function(mat, n=50){
+    if(any(is.na(mat))) warning(sum(is.na(mat)), " NAs found in aracne estimate")
+    mat[is.na(mat)] <- 0
+    path <- seq(from=min(mat), to=max(mat), length.out=n)
+    adjMat <- lapply(path, function(x) Matrix::Matrix((mat>x)*1,sparse=TRUE))
+    list(adjMat=adjMat, BIC=rep(NA, length(path)))
+}
 
 ##' Simulate new data from a model and fit via various algorithms
 ##'
@@ -152,53 +159,75 @@ ecoli_genenetweaver <- function(N_vertex=Inf, vertex_seq, Hdiag=0, Gdiag=0, Kdia
 ##' @param maxFDR FDR threshold at which to report sensitivity
 ##' @return data.table
 fitAndSummarize <- function(model, n=1000, makeModelArgs, maxFDR=.1, parallel=FALSE){
-    model <- getGibbs(model, n*20, thin=.1)
     P <- ncol(model$gibbs)
+    thin <- if(P>64) .5 else .05
+    model <- getGibbs(model, Nkeep=n, thin=thin, burnin=2000)
+
     true <- (abs(model$true$K)+abs(model$true$G)+abs(model$true$H))>0
     diag(true) <- FALSE
-    mgibbs <- apply(model$gibbs, 2, function(col){
-        col[abs(col)>.01] <-  scale(col[abs(col)>.01], scale=FALSE)
-        col
-    })
+
+    ## Fits
+    hfitReg <-hfitCfull <- hfitCreg <- hfitFull <- NULL
+    glasso <- npn <- logiArr <- aracne <- NULL
     
     ## Common parameters
-    tol <- 5e-3
-    newton0 <- TRUE
-    nlambda <- 50
+    newton0 <- FALSE
     lambda.min.ratio <- .4
-    hfitReg <- fitHurdle(model$gibbs, lambda.min.ratio=lambda.min.ratio, nlambda=nlambda, makeModelArgs=list(center=TRUE, scale=FALSE, conditionalCenter=FALSE, newton0=newton0, tol=tol), parallel=parallel, penaltyFactor='identity')
-    hfitCreg <- fitHurdle(mgibbs, lambda.min.ratio=lambda.min.ratio, nlambda=nlambda, makeModelArgs=list(center=TRUE, scale=FALSE, conditionalCenter=FALSE, newton0=newton0, tol=tol), parallel=parallel, penaltyFactor='identity')
-    #hfitCCreg <- fitHurdle(model$gibbs, lambda.min.ratio=lambda.min.ratio, nlambda=nlambda, makeModelArgs=list(center=TRUE, scale=FALSE, conditionalCenter=TRUE, newton0=newton0, tol=tol), parallel=parallel, penaltyFactor='identity')
-    hfitCfull <- fitHurdle(mgibbs, lambda.min.ratio=lambda.min.ratio, nlambda=nlambda, makeModelArgs=list(center=TRUE, scale=FALSE , conditionalCenter=FALSE, newton0=newton0, tol=tol), parallel=parallel, penaltyFactor='full')
-    #hfitCCfull <- fitHurdle(model$gibbs, lambda.min.ratio=lambda.min.ratio, nlambda=nlambda, makeModelArgs=list(center=TRUE, scale=FALSE, conditionalCenter=TRUE, newton0=newton0, tol=tol), parallel=parallel, penaltyFactor='full')
-    hfitFull <- fitHurdle(model$gibbs, lambda.min.ratio=lambda.min.ratio, nlambda=nlambda, makeModelArgs=list(center=TRUE, scale=FALSE , conditionalCenter=FALSE, newton0=newton0, tol=tol), parallel=parallel, penaltyFactor='full')
-    glasso = huge(model$gibbs,method = "mb", nlambda=100,lambda.min.ratio = 0.01)
+    tol <- 1e-2
+    nlambda <- 50
+    debug <- -1
+    
+    hfitReg <- fitHurdle(model$gibbs, lambda.min.ratio=lambda.min.ratio, nlambda=nlambda, makeModelArgs=list(center=TRUE, scale=FALSE, conditionalCenter=FALSE), control=list(newton0=newton0, tol=tol, debug=debug), parallel=parallel, penaltyFactor='identity')
+    ##hfitCreg <- fitHurdle(model$gibbs, lambda.min.ratio=lambda.min.ratio, nlambda=nlambda, makeModelArgs=list(center=TRUE, scale=FALSE, conditionalCenter=TRUE), control=list(newton0=newton0, tol=tol,debug=debug), parallel=parallel, penaltyFactor='identity')
+    ##hfitCfull <- fitHurdle(model$gibbs, lambda.min.ratio=lambda.min.ratio, nlambda=nlambda, makeModelArgs=list(center=TRUE, scale=FALSE, conditionalCenter=TRUE), control=list(newton0=newton0, tol=tol,debug=debug), parallel=parallel, penaltyFactor='full')
+    hfitFull <- fitHurdle(model$gibbs, lambda.min.ratio=lambda.min.ratio, nlambda=nlambda, makeModelArgs=list(center=TRUE, scale=FALSE , conditionalCenter=FALSE), control=list(newton0=newton0, tol=tol, debug=debug), parallel=parallel, penaltyFactor='full')
+
+    message('Glasso')
+    glasso = autoGLM(model$gibbs, nlambda=50,lambda.min.ratio = 0.1, family='gaussian', parallel=parallel)
     S.npn = huge.npn(model$gibbs, npn.func="truncation")
-    npn <- huge(S.npn,method = "mb", nlambda=100,lambda.min.ratio = 0.01)
-    logiArr <- autoLogistic(model$gibbs, lambda.min.ratio=.02, nlambda=100)
-    adjGlasso <- laply(glasso$path, getRoc, trueAdj=true)
-    adjNpn <- laply(npn$path, getRoc, trueAdj=true)
-    adjLogi <- laply(logiArr$adjMat, getRoc, trueAdj=true)
-    #hurdlelist <- list(reg=hfitReg,Creg=hfitCreg, Cfull=hfitCfull, full=hfitFull, CCfull=hfitCCfull, CCreg=hfitCCreg)
-    hurdlelist <- list(reg=hfitReg,Cfull=hfitCfull,  Creg=hfitCreg, full=hfitFull)
+    try(npn <- autoGLM(S.npn, nlambda=50,lambda.min.ratio = 0.1, family='gaussian', parallel=parallel))
+    message('Logistic')
+    ## pumped this up in order to handle strongly separated lambda sets and BIC estimation
+    ## something weird going there
+    try(logiArr <- autoGLM(model$gibbs, lambda.min.ratio=.1, nlambda=50, parallel=parallel))
+    ## add a mutation information method
+    message('Aracne')
+    aracne_time <- system.time(aracne <- process_aracne(netbenchmark::aracne.wrap(model$gibbs)))
+    aracne <- structure(aracne, timing=aracne_time)
+    
+    message('Process')
+    hurdlelist <- list(reg=hfitReg,full=hfitFull,#Cfull=hfitCfull,  Creg=hfitCreg,
+                       Gaussian=glasso, NPN=npn, Logistic=logiArr, Aracne=aracne)
     hurdles <- lapply(hurdlelist, function(hfit){
         rocOr <- laply(hfit$adjMat, getRoc, slicefun=function(sl) sl | Matrix::t(sl), trueAdj=true)
         rocAnd <- laply(hfit$adjMat, getRoc, trueAdj=true)
-        cbind(rocOr, timing=attr(hfit, 'timing')['elapsed'])
+        cbind(rocOr, timing=attr(hfit, 'timing')['elapsed'], BIC=hfit$BIC)
     })
 
-    Mmetric <- namedrbindlist(c(list('Gaussian'=adjGlasso, 'NPN'=adjNpn, 'Logistic'=adjLogi), hurdles), fill=TRUE)
-    Mmetric[, type:= c('Hurdle "Or"'='Hurdle',  'Hurdle "And"'='Hurdle', 'Gaussian'='Gaussian', 'NPN'='Gaussian', 'Logistic'='Logistic')[L1]]
+    Mmetric <- namedrbindlist(hurdles, fill=TRUE)
+                                        #    Mmetric[, type:= c('Hurdle "Or"'='Hurdle',  'Hurdle "And"'='Hurdle', 'Gaussian'='Gaussian', 'NPN'='Gaussian', 'Logistic'='Logistic')[L1]]
+    Mmetric[,totalEdges:=tp+fp]
 
-    Mmetric[,FDR:=pmax(fp/(tp+fp), 0, na.rm=T), keyby=L1]
-    setkey(Mmetric, L1, FDR)
-    supFDR <- Mmetric[FDR<maxFDR, .(sensitivity=tp[1]/(tp[1]+fn[1])), key=L1]
-    
-    fprange <- range(Mmetric$fp)
-    fpgrid <- fprange[1]:fprange[2]
+    Mmetric[,FDR:=pmax(fp/totalEdges, 0, na.rm=T)]
+    setkey(Mmetric, L1, tp)
+    setorder(Mmetric, L1, tp, -FDR)
+    supFDR <- Mmetric[FDR<maxFDR, .(sensitivity=tp[.N]/(tp[.N]+fn[.N]), FDR=FDR[.N], oracle='FDR'), key=L1]
+    setkey(Mmetric, L1, BIC)
+    bic <- Mmetric[, {
+        x_bic <- 1
+        list(sensitivity=tp[x_bic]/(tp[x_bic]+fn[x_bic]),
+             FDR=FDR[x_bic], oracle='BIC', timing=timing[1])
+    }, key=L1]
+    fprange <- range(Mmetric$totalEdges)
+    fpgrid <- fprange[1]:min(fprange[2], sum(true)*2)
+    safeApprox <- getSafeApprox(fpgrid)
+    setkey(Mmetric, L1, totalEdges)
     fpInterpolate <- Mmetric[,{
-                ap <- approx(fp, tp, fpgrid, rule=2)
-                list(fpI=ap$x,tpI=ap$y, Method=L1[1])
-            }, keyby=L1]
-    rbind(supFDR, fpInterpolate, fill=TRUE)
+        tpA <- safeApprox(totalEdges, tp, yright=max(tp))
+        fpA <- safeApprox(totalEdges, fp, yright=max(fp))
+                list(totalEdges=tpA$x, fpI=fpA$y,tpI=tpA$y, Method=L1[1])
+    }, keyby=L1]
+    
+    
+    rbind(supFDR, bic, fpInterpolate, fill=TRUE)
 }

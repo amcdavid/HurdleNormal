@@ -19,21 +19,24 @@ We simulate from:
 ## Generative distributions
 We consider subclasses of the graphical hurdle model, and moderate departures from the class.
 
-1.  Full hurdle model
-2.  Logistic only
-3.  (1) contaminated with a scaled $t_8$ distribution
-4.  A synthetic "1000" cell dataset, comprised of models 1-2
+1.  Chain graphs of varying dimensions with interactions in all three of the hurdle model matrices
+2.  Chain graphs of varying dimensions with only interactions in the G-matrix (an auto-logistic model is complete)
+3.  (1) and (2) contaminated with a scaled $t_8$ distribution
+4.  A subgraph of reported gene-gene interactions from E Coli with both combinations of interactions in G and K.
+5.  A synthetic "10" cell dataset, comprised of models 1,2 and 4.
 
 ## Estimators
-1.  Graphical hurdle
-2.  Neighborhood selection with $\ell_1$-penalized logistic regression
-3.  Neighborhood selection with $\ell_1$-penalized linear regression
-4.  Neighborhood selection with $\ell_1$-penalized linear regression using a Gaussian Copula (non-paranormal)
-5.  Mutual information-based (ARACNE etc, use netbenchmark)
+1.  Graphical hurdle with isometric penalty (standard group lasso)
+2.  Graphical hurdle with anisometric penalty
+3.  Neighborhood selection with $\ell_1$-penalized logistic regression
+4.  Neighborhood selection with $\ell_1$-penalized linear regression
+5.  Neighborhood selection with $\ell_1$-penalized linear regression using a Gaussian Copula (non-paranormal)
+6.  Mutual information-based (ARACNE)
 
 ## Evaluation
-1. False positives/negatives with oracle tuning
-2. False positives/negatives with BIC-based tuning
+1. False positives/negatives along a solution path
+2. False positives/negatives with oracle tuning
+3. False positives/negatives with BIC-based tuning (for models 1-5)
 
 ```{r library}
 ##library(HurdleNormal)
@@ -41,12 +44,19 @@ devtools::load_all('../../')
 source('simulation_library.R')
 ```
 
-```{r ecoli}
+```{r ecoli, eval=FALSE}
 set.seed(5678)
 vertex_seq <- sample(1565, size=500)
 options(mc.cores=30)
 gnw <- ecoli_genenetweaver(vertex_seq=vertex_seq)
 saveRDS(gnw, file='ecoli_network.rds')
 ```
+This loads the estimated ecoli network, downsamples to 500 genes and randomly sets interaction weights (following truncated normal distributions) to define the true interaction matrices $G, H, K$.  40,000 observations are simulated from the model.
+The simulated data is then shifted to fit characteristics of empirical data, and nuisance parameters estimated (the diagonal entries of the interaction matrices).  These estimates are plugged into the diagonals of $G$ and $H$, and the whole enchilada is saved as a `HurdleStructure`.
 
+
+```{r}
+ecoli_gnw = readRDS('ecoli_network.rds')
+
+```
 

@@ -30,8 +30,7 @@ getLimit <- function(hs, engine='R'){
     colnames(fitseries) <- c("G", "H", "K")
     for(i in seq_along(series)){
         sub <- series[i]
-        n <- sub/thin+burnin
-        hs <- suppressMessages(getGibbs(hs, Nt=n, burnin=burnin, thin=thin))
+        hs <- suppressMessages(getGibbs(hs, Nkeep=sub, burnin=burnin, thin=thin))
         #hs$gibbs <- addPseudoCounts(hs$gibbs)
         fit <- getConditionalMLE(hs, testGrad=TRUE, engine=engine) 
         gj <- getJoint(fit)
