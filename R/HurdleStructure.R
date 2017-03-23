@@ -1,4 +1,13 @@
-HurdleStructure <- function(G=NULL, H=NULL, K=NULL, sample=NULL, gibbs=TRUE, estimate=NULL, gibbs_args=list(kcell=1)){
+##' Structure to hold a model, samples and estimates
+##' 
+##' @inheritParams rGibbsHurdle
+##' @param sample optional sample from the model
+##' @param gibbs If \code{TRUE}, then sample from the provided model.  Else may contain a sample from the model
+##' @param estimate optional estimated coefficients (replaces provided \code{G}, \code{H}, \code{K} if provided).
+##' @param gibbs_args list of arguments passed to \link{\code{getGibbs}}
+##' @return \code{list} with the above components
+##' @author Andrew McDavid
+HurdleStructure <- function(G=NULL, H=NULL, K=NULL, sample=NULL, gibbs=TRUE, estimate=NULL, gibbs_args=list(kcell=1, mvnorm=FALSE)){
     if(!is.null(G)){
         .checkArgs(G=G, H=H, K=K)
     } else if(!is.null(sample) || !is.null(gibbs)){
@@ -49,28 +58,73 @@ getNormalizing <- function(hs, subsample=Inf){
     list(logP0=logP0, P=c(exp(logP0), P), margins=margins, lMargin=colSums(t(norm$stat)*norm$logP), mu=norm$mu)
 }
 
-getGibbs <- function(hs, Nt=2000, ...){
+update_nonmissing <- function(key, value, list_){
+    if(!missing(value)){
+        list_[[key]] <- value
+    }
+    list_
+}
+
+##' Update the current gibbs sample for a \code{HurdleStructure}
+##'
+##' Replaces the item \code{'gibbs'}
+##' @param hs \code{HurdleStructure}
+##' @param Nkeep final number of samples to keep
+##' @param kcell Number of cells per sample (cells added on exponential scale)
+##' @param post_fun Function to apply post-sampling, ie, to add contaminating noise
+##' @param mvnorm Sample from multivariate normal (using only K matrix)--intended for applying post-selection models
+##' @param ... passed to \code{rGibbsHurdle}
+##' @return modified \code{HurdleStructure}
+##' @export
+getGibbs <- function(hs, Nkeep=2000, kcell, post_fun, mvnorm, ...){
     if(!is.null(hs$gibbs)) message("Replacing gibbs sample")
-    kcell = hs$gibbs_args$kcell
-    gibbs <- with(hs$true, rGibbsHurdle(G, H, K, Nt=Nt*kcell, ...))
-    ##gibbs <- with(hs$true, rGibbsHurdle(G, H, K, Nt=Nt, ...))
-    ct <- cor.test(gibbs[-1,1], gibbs[-nrow(gibbs),
-                                  1], conf.level=.99)$conf.int[1]
-    if(!is.na(ct) && ct >.1){
-        warning('Significant auto correlation found')
+    hs$gibbs_args <- update_nonmissing('kcell', kcell, hs$gibbs_args)
+    hs$gibbs_args <- update_nonmissing('post_fun', post_fun, hs$gibbs_args)
+    hs$gibbs_args <- update_nonmissing('mvnorm', mvnorm, hs$gibbs_args)
+    
+    kcell <- hs$gibbs_args$kcell
+    post_fun <- hs$gibbs_args$post_fun
+    mvnorm <- hs$gibbs_args$mvnorm
+    if(mvnorm){
+        Sigma <- solve(hs$true$K)
+        mu <- diag(crossprod(Sigma, hs$true$H))
+        gibbs <- MASS::mvrnorm(Nkeep, mu, Sigma)
+    } else{
+        gibbs <- with(hs$true, rGibbsHurdle(G, H, K, Nkeep=Nkeep*kcell, ...))
+        ##gibbs <- with(hs$true, rGibbsHurdle(G, H, K, Nt=Nt, ...))
+        ct <- cor.test(gibbs[-1,1], gibbs[-nrow(gibbs),
+                                          1], conf.level=.99)$conf.int[1]
+        if(!is.na(ct) && ct >.1){
+            warning('Significant auto correlation found')
         }
+    }
     hs$gibbs <- gibbs
     if(kcell>1){
-    cellnum <- rep(seq_len(floor(nrow(gibbs)/kcell)), length.out=nrow(gibbs))
-    gibbs <- do.call(rbind, tapply(seq_len(nrow(gibbs)), cellnum, function(i) log2(colMeans(2^gibbs[i,,drop=FALSE]))))
+        cellnum <- rep(seq_len(floor(nrow(gibbs)/kcell)), length.out=nrow(gibbs))
+        gibbs <- do.call(rbind, tapply(seq_len(nrow(gibbs)), cellnum, function(i) log2(colMeans(2^gibbs[i,,drop=FALSE]))))
     }
     if(is.function(post_fun <- hs$gibbs_args$post_fun)){
-         hs$gibbs <- post_fun(gibbs)
+        hs$gibbs <- post_fun(gibbs)
     } else{
         hs$gibbs <- gibbs   
     }
     
     hs
+}
+
+logit <- function(x) log(x/(1-x))
+expit <- function(x) exp(x)/(1+exp(x))
+
+selectionModel <- function(x, mean_exp=.65, sd_logit_exp=1.5){
+    sx <- scale(x, center=TRUE, scale=TRUE)
+    #bias term, corresponds to detection efficiency
+    beta_col <- sort(rnorm(ncol(sx), mean=logit(mean_exp), sd=sd_logit_exp))[order(attr(sx, 'scaled:center'))]
+    ## add to each column
+    tsx <- t(sx)+beta_col
+    u <- runif(length(x))
+    dim(u) <- dim(x)
+    z <- u<t(expit(tsx))
+    x*z
 }
 
 getDensity <- function(hs, ...){
@@ -203,7 +257,7 @@ getJoint <- function(fit){
 }
 
 
-## Used to simulate Erdos-Renyi networks
+## Used to simulate Erdos-Renyi and chain networks
 simulateHurdle210 <- function(N, p, dependence='G', structure='independence', structureArgs=list(sparsity=.1, groupwise=FALSE), intensityArgs=list(G=1, Hupper=1, Hlower=1, K=-.3, gamma=1), Gdiag=-14, Hdiag=5, Kdiag=1, gibbs_args){
     dependence <- match.arg(dependence, c('G', 'Hupper', 'Hlower', 'K'), several.ok=TRUE)
     structure <- match.arg(structure, c('independence', 'sparse', 'chain'))
@@ -240,7 +294,7 @@ simulateHurdle210 <- function(N, p, dependence='G', structure='independence', st
     diag(G) <- Gdiag
 
     hs <- HurdleStructure(G, H, K, gibbs=FALSE, gibbs_args=gibbs_args)
-    hs <- getGibbs(hs, N*10+2000, burnin=2000, thin=.1)
+    hs <- getGibbs(hs, Nkeep=N, burnin=2000, thin=.1)
     margins <- colMeans(abs(hs$gibbs)>0)
     message(paste(margins, collapse=','))
     hs
