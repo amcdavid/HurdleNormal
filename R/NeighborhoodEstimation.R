@@ -155,6 +155,7 @@ autoGLM <- function(samp, fixed=NULL, parallel=FALSE, keepNodePaths=FALSE, check
 ##Legacy synonym
 autoLogistic <- autoGLM
 
+## Refit the model with an unpenalized regression on the appropriate subsets
 refitGLMVector <- function(path, this.model, y.zif, blocks, family, fuzz=0){
     path_np = path
     loglik_np = rep(99999999, nrow(path))
@@ -241,10 +242,20 @@ fitHurdle <- function(samp, fixed=NULL, parallel=TRUE, keepNodePaths=FALSE, chec
     return(structure(arr, timing=timing))
 }
 
-setupStabilityIndex <- function(sample, strata=rep(1, nrow(sample)), B=50, seed=12345){
+
+##' Set up the subsamples that will be taken for stability selection
+##'
+##' Stability selection is samples without replacement.  This initializes the sampling indices so that we can parallelize without worrying about the state of the random number generator (and recover from errors)
+##' @param obs a matrix of observations from which rows will be sampled
+##' @param strata an optional vector of stratifying covariates, over which the sampling will be balanced
+##' @param B Number of resamples
+##' @param seed random seed
+##' @return list length \code{B} of indices
+##' @export
+setupStabilityIndex <- function(obs, strata=rep(1, nrow(obs)), B=50, seed=12345){
     if(!is.null(seed)) set.seed(12345)
     
-    n <- nrow(sample)
+    n <- nrow(obs)
     ns <- split(seq_len(n), strata)
     samplelist <- replicate(B, {
         x <- unlist(lapply(ns, function(x){
@@ -258,13 +269,27 @@ setupStabilityIndex <- function(sample, strata=rep(1, nrow(sample)), B=50, seed=
     samplelist
 }
 
-stability <- function(sample, fixed, stabIndex, step=seq_along(stabIndex), method, stabilityCheckpointDir=NULL, checkpointDir=NULL, ...){
+##' Refit models for stability selection
+##' 
+##' The function \code{method} (which needs to follow the API of \code{autoGLM}) is called on subsampled data.
+##' Exceptions are caught and output saved to disk since this can be quite computationally expensive.
+##' @param obs a matrix of observations from which rows will be sampled
+##' @param fixed a matrix of covariates
+##' @param stabIndex output from \link{\code{setupStabilityIndex}}
+##' @param step indices of components to run from \code{stabIndex}. Defaults to all.
+##' @param method what method, eg, \code{fitHurdle} or \code{autoGLM}
+##' @param stabilityCheckpointDir path to save output from each stability iteration
+##' @param checkpointDir path to save intermediate output \emph{within} each stability iteration
+##' @param ... arguments passed to \code{method}
+##' @return list of output from \code{method}, eg, adjacency matrices.
+##' @export
+stability <- function(obs, fixed, stabIndex, step=seq_along(stabIndex), method, stabilityCheckpointDir=NULL, checkpointDir=NULL, ...){
     stabout <- list()
     accessDirOrDie(stabilityCheckpointDir)
     scheckpointDir <- sfixed <- NULL
 
     for(i in step){
-        ss <- sample[stabIndex[[i]],,drop=FALSE]
+        ss <- obs[stabIndex[[i]],,drop=FALSE]
         if(!is.null(fixed)){
             sfixed <- fixed[stabIndex[[i]],,drop=FALSE]
             ## test for rank-deficient fixed columns
@@ -291,7 +316,24 @@ stability <- function(sample, fixed, stabIndex, step=seq_along(stabIndex), metho
     stabout
 }
 
-collectStability <- function(stabout, fdr=.02, stabilityCheckpointDir=NULL){
+##' Process stability selected networks
+##'
+##' Stability selection attempts to estimate the probability
+##' that an edge would have been included when we sample from the population.
+##' Following Shah and Samsworth, we process the stability selection to give stability coefficients for each edge.
+##' From Shah and Samsworth: p = #edges = m^2; q = max(iknot) and theta = q/p.
+##' We bound the set of population transient edges, which have probabilities of selection below
+##' theta (the same theta as above for convenience) when sampling from the population.
+##' We call an edge \emph{empirically transient} when the stability coefficient is below tau.
+##' Then for a sparsity theta < .1 and stability coefficient tau > .7, the ratio of empirical transient edges to population edges is less than 1%, and in fact typically more like .1%.
+##' (Table 2 of Shah and Samworth)
+##' @param stabout output of \link{\code{stability}}
+##' @param theta sparsity of the solution. default .1.
+##' @param tau stability selection parameter, default .7.
+##' @param stabilityCheckpointDir 
+##' @return 
+##' @author Andrew McDavid
+collectStability <- function(stabout, theta=.1, tau=.7, stabilityCheckpointDir=NULL){
     if(!is.null(stabilityCheckpointDir)){
         chkfiles <- list.files(stabilityCheckpointDir, pattern='chk_s.*.rds', full.names=TRUE)
         Get <- function(i) readRDS(chkfiles[i])
@@ -301,17 +343,17 @@ collectStability <- function(stabout, fdr=.02, stabilityCheckpointDir=NULL){
         ni <- sum(!sapply(stabout, is.null))
     }
     x1 <- Get(1)
-    p <- ncol(x1$adjMat[[1]])
-    iknot <- unique(sort(c(x1$trueEdges, floor(fdr*p^2))))
-    e1 <- interpolateEdges(x1$adjMat, x1$lambda, knot=iknot)
+    m <- ncol(x1$adjMat[[1]])
+    iknot <- floor(seq(0, theta*p^2, length.out=50))
+    e1 <- interpolateEdges(x1, knot=iknot)
 
-    stabFlat <- Matrix(0, nrow=p^2, ncol=length(e1$trueEdges), sparse=TRUE)
+    stabFlat <- Matrix(0, nrow=m^2, ncol=length(e1$trueEdges), sparse=TRUE)
 
     si <- 0
     for(i in seq_len(ni)){
         tt <- try({
         xx <- Get(i)
-        ee <- interpolateEdges(xx$adjMat, xx$lambda, iknot)
+        ee <- interpolateEdges(xx, knot=iknot)
         hasedge <- (abs(sparseCbind(ee$edgeInterp))>0)*1
         #print(sum(hasedge))
         stabFlat <- stabFlat+ hasedge
@@ -321,8 +363,8 @@ collectStability <- function(stabout, fdr=.02, stabilityCheckpointDir=NULL){
         if(inherits(tt, 'try-error')) warning('Error reading trial ', i, ' in ', stabilityCheckpointDir)
     }
     stabFlat <- stabFlat/si
-    fdri <- which.min(abs(iknot-floor(fdr*p^2)))
+    fdri <- which.min(abs(iknot-floor(tau*m^2)))
     fdrStab <- stabFlat[,fdri]
-    dim(fdrStab) <- c(p, p)
-    list(stabFlat, estEdges=iknot, fdrStab)
+    dim(fdrStab) <- c(m, m)
+    list(stabCoefEdge=stabFlat, estEdges=iknot, highProbEdge=fdrStab)
 }

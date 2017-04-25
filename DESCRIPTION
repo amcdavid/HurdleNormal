@@ -34,7 +34,9 @@ Suggests:
     rmarkdown,
     huge,
     igraph,
-    netbenchmark
+    netbenchmark,
+    Mus.musculus,
+    MAST
 LinkingTo: RcppArmadillo,
     Rcpp
 RoxygenNote: 6.0.1

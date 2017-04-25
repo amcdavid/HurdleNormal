@@ -207,13 +207,14 @@ onlyTri <- function(mat, diag=FALSE, upper=TRUE)if(upper) mat[upper.tri(mat)] el
 
 ##' Interpolate set of adjacency matrix across a set of edges
 ##'
-##' @param Mpath list of (possibly signed, weighted) adjacency matrices
-##' @param lambda penalty parameter that generated each matrix
+##' @param array \code{neighborhoodToArray} output
 ##' @param knot optional vector of number of edges over which to conduct the interpolation.  If missing then we use something on the order of P*log(P), where P is the number of nodes.
 ##' @param nknot number knots over which to interpolate
 ##' @export
-##' @return a list of `edgeInterp`: contains a list of length `nknot` of sparse adjacency matrices, `estEdges` the desired number of edges to be interpolated, `trueEdges` the actual number of edges
-interpolateEdges <- function(Mpath, lambda, knot, nknot=100){
+##' @return a list of `edgeInterp`: contains a list of length `nknot` of sparse adjacency matrices, `estEdges` the desired number of edges to be interpolated, `trueEdges` the actual number of edges, `BIC`, the interpolated BIC.
+interpolateEdges <- function(array, lambda, knot, nknot=100){
+    lambda <- array$lambda
+    Mpath <- array$adjMat
     lo <- order(lambda)
     Mpath <- Mpath[lo]
     lambda <- lambda[lo]
@@ -240,6 +241,9 @@ interpolateEdges <- function(Mpath, lambda, knot, nknot=100){
             edgeInterp[[i]][change] <- 0
         }
     }
+
+    safeApprox <- getSafeApprox(lknots)
+    BIC <- safeApprox(lambda, array$BIC, f=1, method='constant')$y
     truenz <- sapply(edgeInterp, function(x) sum(abs(x)+abs(Matrix::t(x))>0))
-    list(edgeInterp=edgeInterp, estEdges=knot, trueEdges=truenz)
+    list(edgeInterp=edgeInterp, estEdges=knot, trueEdges=truenz, BIC=BIC)
 }
