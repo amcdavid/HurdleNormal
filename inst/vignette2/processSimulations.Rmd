@@ -10,6 +10,8 @@ library(HurdleNormal)
 library(cowplot)
 theme_set(theme_bw())# + theme(legend.position=c(.8, .2)))
 
+label_singleline <- function(x) label_value(x, multi_line = FALSE)
+
 sims_files <- list.files('sim_chkpoint', pattern='*.rds', full.names=TRUE)
 fittedmodels <- lapply(sims_files, readRDS)
 
@@ -27,12 +29,11 @@ Here are examples of models 1,2 and 4.
 modeledges <- sapply(modelList, function(x) sum((abs(x$true$G) + abs(x$true$H) + abs(x$true$K))>0) - ncol(x$true$G))/2
 collectFDR <- list()
 setDT(modelArgs)
-modelArgs[, i:=rev(seq_len(nrow(modelArgs)))]
-modelArgs[is.na(contam), contam:=FALSE]
+modelArgs[is.na(contam), contam:='none']
 modelArgs[is.na(P), P:=500]
 modelArgs[kcell==1 & (P==24  | type=='ecoli') , aspect1:='consistency']
 modelArgs[P==32 | type=='ecoli', aspect2:='kcell']
-modelArgs[kcell == 1 & (!contam) & P!=24 & (N==100  | type=='ecoli'), aspect3:='overall']
+modelArgs[kcell == 1 & contam =='none' & P!=24 & (N==100  | type=='ecoli'), aspect3:='overall']
 modelArgs[,edges:=modeledges]
 
 renameDT <- data.table(L1=c('full', 'reg'), Method=c('Anisometric', 'Isometric'))
@@ -40,11 +41,12 @@ for(i in seq_along(fittedmodels)){
     fittedmodels[[i]] <- rbindlist(fittedmodels[[i]], idcol='i')[!L1 %in% c('Cfull', 'Creg')]
 }
 allmodels <- rbindlist(fittedmodels, idcol='rep')
-
+allmodels[L1=='Aracne' & oracle=='BIC', FDR:=NA]
 
 oracles <- allmodels[!is.na(oracle),.(sensitivity=mean(sensitivity), fdr=mean(FDR), sd_sens = sd(sensitivity), sd_fdr = sd(FDR)),keyby=list(L1, oracle, i)][modelArgs,,on='i']
 oracles[, Nfactor:=as.numeric(factor(N))]
-oracles[is.na(contam), contam:=FALSE]
+oracles[is.na(contam), contam:='none']
+oracles[oracle=='BIC' & L1=='Aracne', ':='(FDR=NA, sensitivity=NA)]
 setkey(oracles, type, L1, Nfactor)
 ```
 Load processed simulations.
@@ -52,7 +54,7 @@ Load processed simulations.
 
 
 ```{r bic_consistency}
-bic_plt <- ggplot(oracles[oracle=='BIC' & aspect1=='consistency'], aes(x=fdr, y=sensitivity, label=Nfactor, color=L1))+ geom_point(size=.1) + geom_text(vjust=0, hjust=0, size=3) + geom_path(aes(group=L1)) + facet_wrap(~type + contam, labeller=function(x) label_value(x, multi_line = FALSE)) + ggtitle("Consistency with BIC tuning") + ylab('Sensitivity') + xlab('FDR')  + scale_color_discrete('Method')+ theme(legend.position=c(.8, .2))
+bic_plt <- ggplot(oracles[oracle=='BIC' & aspect1=='consistency'], aes(x=fdr, y=sensitivity, label=Nfactor, color=L1))+ geom_point(size=.1) + geom_text(vjust=0, hjust=0, size=3) + geom_path(aes(group=L1)) + facet_wrap(~type + contam, labeller=label_singleline) + ggtitle("Consistency and BIC tuning") + ylab('Sensitivity') + xlab('FDR')  + scale_color_discrete('Method')+ theme(legend.position=c(.8, .2))
 ```
 
 ```{r, eval=FALSE}
@@ -64,38 +66,39 @@ plt
 
 ```{r overall}
 overall_plot <- ggplot(oracles[oracle=='FDR' & N==100 & P!=24 & type !='ecoli'], aes(y=sensitivity, color=L1, lty=factor(kcell))) + facet_wrap(~type, scales='free_y') + ylab('Sensitivity') +geom_line() + scale_linetype('# Cells')  + guides(colour = "none")
-dim_scale_plt <- overall_plot+aes(x=P)+ xlab('M')+ ggtitle("Oracle tuning: dimensional scaling") + guides(colour='none', linetype='none')
-ecoli_plt <- overall_plot %+% oracles[oracle=='FDR' & type =='ecoli']+ aes(x=N) + geom_line() + ggtitle("Sample size") +ylab(NULL)
+dim_scale_plt <- overall_plot+aes(x=P)+ xlab('M')+ ggtitle("FDR oracle tuning: dimensional scaling") + guides(colour='none', linetype='none')
+ecoli_plt <- overall_plot %+% oracles[oracle=='FDR' & type =='ecoli'& contam=='none']+ aes(x=N) + geom_line() + ggtitle("Sample size") +ylab(NULL) 
 
 ```
 
 ```{r ribbonplot}
-modelI <- modelArgs[P>=64 & kcell==1  & !contam, .(i, P, type, edges, kcell, N)]
+modelI <- modelArgs[P %in% c(24, 500)&  ( N<2000 | type=='ecoli') & kcell==1  & contam %in% c('none', 'selection'), .(i, P, type, edges, kcell, N, contam)]
 fi <- allmodels[modelI,,on='i']
 ## fi <- merge(fi, renameDT, by='L1', all.x=TRUE)
 ## fi[,Method:= ifelse(is.na(Method), L1, Method)]
 #fi[is.na(oracle),':='(sensitivity=tpI/edges, FDR=fpI/(fpI+tpI), totalI=floor(fpI+tpI))]
-fi[, totalI:=floor(fpI+tpI)]
-setkey(fi, rep, i, L1, totalI)
-#fi[,fpI:=
+setkey(fi, rep, i, L1, totalEdges)
 
-roclike <- fi[is.na(oracle) & totalI<1000,.(FDR=mean(fpI/totalI), sensitivity=mean(tpI/edges), sdFDR=sd(fpI/totalI)/sqrt(.N), sdSens=sd(tpI/edges)/(sqrt(.N))), keyby=list(L1, totalI, i)]
-roclike[,':='(FDR=caTools::runmean(FDR, 5), sensitivity=caTools::runmean(sensitivity, k=5)), keyby=list(L1, i)]
+roclike <- fi[is.na(oracle) & totalEdges<1000,.(FDR=mean(fpI/totalEdges), sensitivity=mean(tpI/edges), sdFDR=sd(fpI/totalEdges)/sqrt(.N), sdSens=sd(tpI/edges)/(sqrt(.N))), keyby=list(L1, totalEdges, i, N, type, contam)]
+roclike[,':='(FDR=caTools::runmean(FDR, 2), sensitivity=caTools::runmean(sensitivity, k=2)), keyby=list(L1, N, type, contam, i)]
+roclike[,fN:=factor(N)]
 roclike[,.(medianSD_FDR=median(sdFDR, na.rm=TRUE),
           medianSD_sens=median(sdSens, na.rm=TRUE))]
 
-bic <- fi[oracle=='BIC',.(FDR=median(FDR), sensitivity=median(sensitivity)), keyby=list(i, L1)]
+bic <- fi[oracle=='BIC',.(FDR=median(FDR), sensitivity=median(sensitivity)), key=key(roclike)]
 
 
-ggplot(roclike, aes(x=FDR, y=sensitivity, color=L1))+geom_path() + facet_wrap(~i, scales='free') + geom_point(data=bic, pch=9)
+ggplot(roclike, aes(x=FDR, y=sensitivity, color=L1))+geom_path() + facet_wrap(~type + contam+N, labeller=label_singleline, scales='free_y') + geom_point(data=bic, pch=9)
+```
 
-roclike <- mfi[,.(vbar=mean(value), sdv=sd(value)/sqrt(.N)), keyby=list(L1, totalI, i, variable)]
-roclike[,':='(vlo=vbar-sdv,
-              vhi=vbar+sdv)]
+```{r eval=FALSE}
+## roclike <- mfi[,.(vbar=mean(value), sdv=sd(value)/sqrt(.N)), keyby=list(L1, totalEdges, i, variable)]
+## roclike[,':='(vlo=vbar-sdv,
+##               vhi=vbar+sdv)]
 
-roclike_wide <- dcast(roclike, L1 + totalI + i ~ variable, value.var='vbar')
+roclike_wide <- dcast(roclike, L1 + totalEdges + i ~ variable, value.var='vbar')
 
-p <- ggplot(roclike, aes(x=totalI, y=vbar, col=L1))+geom_line() + xlab("Total Edges") + ylab("Measure") + facet_wrap(~i+variable, scales='free') + xlim(0, 100)
+p <- ggplot(roclike, aes(x=totalEdges, y=vbar, col=L1))+geom_line() + xlab("Total Edges") + ylab("Measure") + facet_wrap(~i+variable, scales='free') + xlim(0, 100)
 
 
 
@@ -104,10 +107,7 @@ roclike[,':='(tplo=tpbar-sdtp,
          tphi=tpbar+sdtp)]
     p <- ggplot(roclike, aes(x=fpI, y=tpbar, col=L1))+geom_line() + xlab("False Edges") + ylab("True Edges") + xlim(0, 20) + facet_wrap(~i)
     print(direct.label(p + geom_ribbon(aes(ymin=tplo, ymax=tphi, fill=L1), alpha=.3), 'angled.boxes'))
-    collectFDR[[i]] <- maxFDRbar[,i:=i]
-}
 
-collectFDR <- merge(rbindlist(collectFDR), modelArgs, by='i')
 p <- ggplot(collectFDR[Method %in% c('Anisometric', 'Isometric', 'Logistic', 'Gaussian', 'NPN') & N==100 & !(type %like% '2')], aes(y=sensbar, x=P, color=Method)) + geom_l2ine()+ facet_wrap(~type) + theme_bw() + xlab('M') + ylab('Sensitivity')
 direct.label(p, 'angled.boxes')
 
@@ -117,6 +117,6 @@ p <- ggplot(collectFDR[Method %in% c('Anisometric', 'Isometric', 'Logistic', 'Ga
 ```
 
 ```{r draw_plots, fig.width=12, fig.height=12}
-print(ggdraw() + draw_plot(dim_scale_plt, y=.65, height=.35, width=.6)+ draw_plot(ecoli_plt, y=.65, x=.6, height=.35, width=.4) + draw_plot(bic_plt, height=.65) + draw_plot_label(c('A', 'B', 'C'), c(0, .6, 0), c(0, 0, .65)))
-
+ggdraw() + draw_plot(dim_scale_plt, y=.65, height=.35, width=.6)+ draw_plot(ecoli_plt, y=.65, x=.6, height=.35, width=.4) + draw_plot(bic_plt, height=.65) + draw_plot_label(c('A', 'B', 'C'), c(0, .6, 0), c(1, 1, .65))
+ggsave('./simulations_multipanel.pdf', height=10, width=8)
 ```

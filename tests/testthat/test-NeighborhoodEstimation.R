@@ -123,19 +123,19 @@ test_that("Including relevant fixed columns changes adjacency", {
 
 context('Edge interpolation')
 test_that('True edges are monotone increasing', {
-    ie <- interpolateEdges(fit$adjMat, fit$lambda, nknot=9)
+    ie <- interpolateEdges(fit, nknot=9)
     expect_equal(ie$trueEdges, sort(ie$trueEdges, dec=TRUE))
 
-    ie <- interpolateEdges(al$adjMat, al$lambda, nknot=20)
+    ie <- interpolateEdges(al, nknot=20)
     expect_equal(ie$trueEdges, sort(ie$trueEdges, dec=TRUE))
     
-    ie <- interpolateEdges(al2$adjMat, al2$lambda, nknot=5)
+    ie <- interpolateEdges(al2, nknot=5)
     expect_equal(ie$trueEdges, sort(ie$trueEdges, dec=TRUE))
     
-    ie <- interpolateEdges(al3$adjMat, al3$lambda)
+    ie <- interpolateEdges(al3)
     expect_equal(ie$trueEdges, sort(ie$trueEdges, dec=TRUE))
     
-    ie <- interpolateEdges(al4$adjMat, al4$lambda)
+    ie <- interpolateEdges(al4)
     expect_equal(ie$trueEdges, sort(ie$trueEdges, dec=TRUE))
 
 })

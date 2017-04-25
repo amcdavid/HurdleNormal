@@ -8,8 +8,9 @@ MODELS_PER_ARRAY <- 3
 options(mc.cores=floor(MC_CORES/MODELS_PER_ARRAY))
 
 devtools::load_all('../..')
+source('common.R')
 source('simulation_library.R')
-writeModels <- TRUE
+writeModels <- FALSE
 fitModels <- TRUE
 
 if(writeModels){
@@ -23,7 +24,7 @@ if(writeModels){
                                                    kcell=c(1, 10), contam='none', stringsAsFactors = FALSE))
     modelArgs <- modelArgs[nrow(modelArgs):1,]
     modelArgs$i <- 1:nrow(modelArgs)
-    modelArgs <- modelArgs[c(8, 23, 24, 39),]
+    ## modelArgs <- modelArgs[c(8, 23, 24, 39),]
     modelList <- list()
     for(i in seq_len(nrow(modelArgs))){
         thismodel <- modelArgs[i,'type']
@@ -61,8 +62,8 @@ if(fitModels){
         saveRDS(fittedmodels, file.path('sim_chkpoint', sprintf('sim_%02d.rds', k)))
     })
     
-     fittedmodels <- lapply(modelList, function(m){
-        fitAndSummarize(model=m, n=nrow(m$gibbs), parallel=TRUE)
-     })
+     ## fittedmodels <- lapply(modelList, function(m){
+     ##    fitAndSummarize(model=m, n=nrow(m$gibbs), parallel=TRUE)
+     ## })
     
 }

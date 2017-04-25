@@ -137,14 +137,6 @@ ecoli_genenetweaver <- function(N_vertex=Inf, vertex_seq, Hdiag=0, Gdiag=0, Kdia
     hs
 }
 
-process_aracne <- function(mat, n=50){
-    if(any(is.na(mat))) warning(sum(is.na(mat)), " NAs found in aracne estimate")
-    mat[is.na(mat)] <- 0
-    path <- seq(from=min(mat), to=max(mat), length.out=n)
-    adjMat <- lapply(path, function(x) Matrix::Matrix((mat>x)*1,sparse=TRUE))
-    list(adjMat=adjMat, BIC=rep(NA, length(path)))
-}
-
 ##' Simulate new data from a model and fit via various algorithms
 ##'
 ##' 1. Sample a data set from model
