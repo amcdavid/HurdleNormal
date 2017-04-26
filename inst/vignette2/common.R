@@ -71,14 +71,13 @@ fitSomeModels <- function(samp, models=c('hurdle', 'logistic', 'gaussian', 'gaus
 
 
 loadLausanne <- function(freq=.05){
-    samp1c <- readRDS('data_private/fl1.rds')
     raw <- readRDS('data_private/AllCells.rds')
     rexprs <- raw$exprs
     colnames(rexprs) <- raw$fdata$shortName
     row.names(raw$fdata) <- raw$fdata$primerid <- raw$fdata$shortname
-    fl <- FromMatrix("FluidigmAssay", exprsArray = rexprs, cData = raw$cdata, fData = raw$fdata)
+    fl <- FromMatrix("FluidigmAssay", exprsArray = t(rexprs), cData = raw$cdata, fData = raw$fdata)
     frq1 <- freq(subset(fl, ncells==1))
-    fl <<- fl[,frq1>freq]
+    fl <<- fl[frq1>freq,]
     samp10 <<- subset(fl, ncells==10)
     samp1 <<- subset(fl, ncells==1)
 }
@@ -195,18 +194,6 @@ plotNetwork <- function(gadj,  layout=layout_with_kk,  width.scale=2, colorbar=F
 }
 
     
-loadCART <- function(){
-    library(CARTDP)
-    data(cart_sc)
-    layer(cart_sc) <- 'tpm'
-    tcart_sc <- thresholdSCRNACountMatrix(2^exprs(cart_sc)-1, nbins=20)
-    cart_sc <- addlayer(cart_sc, 'et')
-    layer(cart_sc) <- 'et'
-    exprs(cart_sc) <- tcart_sc$counts_threshold
-    #cart_sc <- subset(cart_sc, order %in% c('IP', 'peak'))
-    cart_sc[,freq(cart_sc)>.15]
-}
-
 goCriteria <- c('GO:0003677', 'GO:0006355', #transcription factors
                 'GO:0006351', #promoters
                 'GO:0016070', #mRNA metabolic process

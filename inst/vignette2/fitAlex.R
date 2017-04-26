@@ -1,6 +1,6 @@
 ## sbatch -n1 -c16 -t1-01 R --vanilla -f fitAlex.R
 source('common.R')
-data('shalek')
+load(system.path('data-raw', 'shalek.RData', package='HurdleNormal'))
 sca_alex <- with(shalek, FromMatrix(exprs, cData, fData))
 astim <- MAST::subset(sca_alex, Stim=='LPS' & Time=='2h')
 astim <- astim[freq(astim)>.3,]

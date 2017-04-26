@@ -5,3 +5,5 @@ inst/doc
 .DS_Store
 .emacs.desktop
 .Rproj.user
+inst/vignette2/*chkpoint/
+inst/vignette2/*.RData
