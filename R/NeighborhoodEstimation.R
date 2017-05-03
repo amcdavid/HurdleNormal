@@ -328,12 +328,11 @@ stability <- function(obs, fixed, stabIndex, step=seq_along(stabIndex), method, 
 ##' Then for a sparsity theta < .1 and stability coefficient tau > .7, the ratio of empirical transient edges to population edges is less than 1%, and in fact typically more like .1%.
 ##' (Table 2 of Shah and Samworth)
 ##' @param stabout output of \link{\code{stability}}
-##' @param theta sparsity of the solution. default .1.
-##' @param tau stability selection parameter, default .7.
+##' @param theta sparsity of the solution in terms of the number of parameters. default .1.
 ##' @param stabilityCheckpointDir 
 ##' @return 
 ##' @author Andrew McDavid
-collectStability <- function(stabout, theta=.1, tau=.7, stabilityCheckpointDir=NULL){
+collectStability <- function(stabout, theta=.1, stabilityCheckpointDir=NULL){
     if(!is.null(stabilityCheckpointDir)){
         chkfiles <- list.files(stabilityCheckpointDir, pattern='chk_s.*.rds', full.names=TRUE)
         Get <- function(i) readRDS(chkfiles[i])
@@ -344,7 +343,7 @@ collectStability <- function(stabout, theta=.1, tau=.7, stabilityCheckpointDir=N
     }
     x1 <- Get(1)
     m <- ncol(x1$adjMat[[1]])
-    iknot <- floor(seq(0, theta*p^2, length.out=50))
+    iknot <- floor(seq(0, 1.5*theta*m^2, length.out=50))
     e1 <- interpolateEdges(x1, knot=iknot)
 
     stabFlat <- Matrix(0, nrow=m^2, ncol=length(e1$trueEdges), sparse=TRUE)
@@ -363,7 +362,7 @@ collectStability <- function(stabout, theta=.1, tau=.7, stabilityCheckpointDir=N
         if(inherits(tt, 'try-error')) warning('Error reading trial ', i, ' in ', stabilityCheckpointDir)
     }
     stabFlat <- stabFlat/si
-    fdri <- which.min(abs(iknot-floor(tau*m^2)))
+    fdri <- which.min(abs(iknot-floor(theta*m^2)))
     fdrStab <- stabFlat[,fdri]
     dim(fdrStab) <- c(m, m)
     list(stabCoefEdge=stabFlat, estEdges=iknot, highProbEdge=fdrStab)
