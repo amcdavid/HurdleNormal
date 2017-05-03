@@ -30,12 +30,12 @@ process_aracne <- function(mat, n=50){
     list(adjMat=adjMat, lambda=path, BIC=rep(NA, length(path)))
 }
 
-fitSomeModels <- function(samp, models=c('hurdle', 'logistic', 'gaussian', 'gaussianRaw', 'aracne'), fixed=NULL, parallel=TRUE, control=list(debug=1, maxrounds=1000, tol=1e-3), lambda.min.ratio=.2, nlambda=100, checkpointDir=NULL){
+fitSomeModels <- function(samp, models=c('hurdle', 'logistic', 'gaussian', 'gaussianRaw', 'aracne'), fixed=NULL, parallel=TRUE, control=list(debug=1, maxrounds=1000, tol=1e-3), lambda.min.ratio=.2, nlambda=100, checkpointDir=NULL, keepNodePaths=TRUE){
     samp1c <- t(assay(samp))
     sampCenter <- precenter(t(assay(samp)))
     out <- setNames(as.list(models), models)
     if('hurdle' %in% models){
-        hCNgo <- fitHurdle(sampCenter, parallel=parallel, control=control, makeModelArgs=list(scale=FALSE, fixed=fixed, center=TRUE, conditionalCenter=TRUE), lambda.min.ratio=lambda.min.ratio, nlambda=nlambda, checkpointDir=checkpointDir, keepNodePaths=TRUE)
+        hCNgo <- fitHurdle(sampCenter, parallel=parallel, control=control, makeModelArgs=list(scale=FALSE, fixed=fixed, center=TRUE, conditionalCenter=TRUE), lambda.min.ratio=lambda.min.ratio, nlambda=nlambda, checkpointDir=checkpointDir, keepNodePaths=keepNodePaths)
         mCNgo <- interpolateEdges(hCNgo)
         out$hurdle <- mCNgo
         out$hurdle$paths <- attr(hCNgo, 'nodePaths')
@@ -370,7 +370,7 @@ plotgenesee <- function(x, godb, goTerm,network, goids, additionalGenes=NULL){
     V(networkG)$label.color <- paltable[,ifelse(V %in% additionalGenes, 'red', 'black')]
     plotNetwork(networkG, layout=layout_with_fr, vertex.label.cex=1)
     setkey(goTerm, color)
-    leg <- unique(goTerm)
+    leg <- unique(goTerm, by='category')
     legend('bottomright', fill=leg[,color], legend=leg[,category])
 
     setkey(goTerm, GOID)

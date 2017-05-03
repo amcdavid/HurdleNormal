@@ -94,30 +94,3 @@ covariates = cbind(1, scale(subset(shalek$cData, Time=='1h')$ngeneson))
 indices=c(1:10, 21:30)
 fitted = fitHurdle(logExpression1h,  fixed=covariates, parallel=TRUE, indices = indices, control=list(debug=0))
 ```
-
-
-
-## Styles
-
-The `html_vignette` template includes a basic CSS theme. To override this theme you can specify your own CSS in the document metadata as follows:
-
-    output: 
-      rmarkdown::html_vignette:
-        css: mystyles.css
-
-## Figures
-
-The figure sizes have been customised so that you can easily put two images side-by-side. 
-
-```{r, fig.show='hold'}
-plot(1:10)
-plot(10:1)
-```
-
-You can enable figure captions by `fig_caption: yes` in YAML:
-
-    output:
-      rmarkdown::html_vignette:
-        fig_caption: yes
-
-Then you can use the chunk option `fig.cap = "Your figure caption."` in **knitr**.

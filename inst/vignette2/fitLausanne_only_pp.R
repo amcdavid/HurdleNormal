@@ -55,7 +55,7 @@ for(i in seq_len(nrow(fsubset))){
     ss$logistic <- stability(ee1, fixed, si, method=autoLogistic, stabilityCheckpointDir=paste0('l_', chkpt), parallel=T, nlambda=50, lambda.min.ratio=.2, family='binomial', keepNodePaths=FALSE)
     ss$gaus10 <- stability(ee10, fixed10, si10, method=autoLogistic, parallel=T, nlambda=50, lambda.min.ratio=.3, stabilityCheckpointDir=paste0('g10_', chkpt), family='gaussian', keepNodePaths=FALSE)
 }
-    cs <- mclapply(str_c(c('h_', 'g_', 'l_', 'g10_'), chkpt), function(x) collectStability(theta=.1, tau=.7, stabilityCheckpointDir=x)[[3]], mc.cores=4)
+    cs <- mclapply(str_c(c('h_', 'g_', 'l_', 'g10_'), chkpt), function(x) collectStability(theta=.04, stabilityCheckpointDir=x)[[3]], mc.cores=4)
     manystab[[i]] <- cs
 }
 

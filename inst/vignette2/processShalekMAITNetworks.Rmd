@@ -15,188 +15,22 @@ library(Mus.musculus)
 source('common.R')
 opts_chunk$set(cache=TRUE, autodep=TRUE, echo=FALSE, error=FALSE, warning=FALSE)
 
-#Set to false if MAIT data is not present
-EVAL_MAIT <- TRUE
+#Set to false if Tfh data is not present
+EVAL_TFH <- TRUE
 ```
 
-```{r loadLausanne, cache=FALSE, eval=EVAL_MAIT}
-loadLausanne()
-```
-
-```{r dataExplain, results='asis',  eval=EVAL_MAIT}
-dcast(as.data.frame(colData(fl)), PatientID+run~SafeCS+ncells)
-```
-
-
-```{r compare10cell, dev=c('CairoPNG', 'pdf'), fig.width=4, fig.height=4, eval=EVAL_MAIT}
-library(lme4)
-concord <- getConcordance(samp10, samp1, groups=c('SafeCS'))
-ggplot(concord, aes(y=et.ref, x=et.comp))+geom_point()+geom_abline(slope=1, intercept=0) + xlab("log(1 cell average)") + ylab("log(10 cell average)") + theme_bw() + theme(legend.position=c(.8, .2)) + coord_cartesian(xlim=c(5, 23), ylim=c(5, 23))#+geom_text(aes(label=substr(primerid, 1, 2)), size=3)
-
-muLS <- lmer(et.ref~et.comp+ (1|primerid), data=concord)
-
-samp1HIV <- subset(samp1, SafeCS=='pp' & run=='HIV')
-samp10HIV <- subset(samp10, SafeCS=='pp' & run=='HIV')
-frqs <- data.table(freq1= freq(samp1HIV), freq10=freq(samp10HIV))
-
-#lm(log(1.01-freq10) ~ log(1.01-freq1), data=frqs)
-
-freqls <- nls(freq10 ~ 1-(1- B*freq1+A)^(10), data=frqs, start=list(B=1, A=0))
-
-summary(freqls)
-
-frqs[,resid:=resid(freqls, 'pearson')]
-frqs[,fitted:=predict(freqls)]
-frqs[,expected:= 1-(1- freq1)^(10)]
-
-ggplot(frqs, aes(x=freq1, y=freq10)) + geom_point()+ geom_line(aes(y=fitted, color='nls-fitted')) + geom_line(aes(y=expected, color='plugin')) + theme_bw() + xlab('Frequency 1 Cell')+ ylab('Frequency 10 Cell') + theme(legend.position=c(.8, .2))
-
-M <- as(samp1, 'data.table')
-
-varfun <- function(value, n0=0, nu0=0, tau20=0, pi0=0){
-    ee<- 2^value-1
-    n <- sum(value>0)
-    nu <- (mean(ee[value>0])*n+nu0*n0)/(n+n0)
-    tau2 <- (var(ee[value>0])*n+tau20*n0)/(n+n0)
-    pi <- (mean(value>0)*length(value)+pi0*n0)/(length(value)+n0)
-    list(n=n, nu=nu, tau2=tau2, pi=pi, var10exp=(nu^2*(1-pi)+tau2)/(nu^2*pi))
-}
-
-varall <- M[,varfun(value),keyby=list(primerid, PatientID, SafeCS)]
-varp <- M[,varfun(value),keyby=list(primerid, SafeCS)]
-setnames(varp, c('nu', 'tau2', 'pi'), c('nu0', 'tau20', 'pi0'))
-varp[,':='(n=NULL, var10exp=NULL, n0=10)]
-M <- M[varp,,on=c('primerid', 'SafeCS')]
-varallshrink <- M[,varfun(value, n0=4, nu0=nu0[1], tau20=tau20[1], pi0=pi0[1]), keyby=list(primerid, PatientID, SafeCS)]
-
-
-vari <- M[,varfun(value), keyby=list(PatientID)]
-vars <- M[,varfun(value), keyby=list(SafeCS)]
-
-var10 <- as(samp10, 'data.table')
-var10 <- var10[,list(var10emp=var(value)), keyby=list(primerid, PatientID, SafeCS)]
-vv <- var10[varall,,on=c('primerid', 'PatientID', 'SafeCS')]
-with(vv, plot(var10emp, var10exp))
-with(vv, cor(var10emp, var10exp, use='complete'))
-
-```
-
-
-```{r testCDRTrans, eval=FALSE}
-x <- rnorm(1000)
-Fx <- ecdf(x)
-x2 <- rnorm(1000)
-y <- x2^2
-Fy <- ecdf(y)
-yy <- seq(-1, 1, by=.1)
-Py <- Fy(yy)
-Pxy <- Fx(ifelse(yy>0, sqrt(yy), -Inf))-Fx(ifelse(yy>0, -sqrt(yy), -Inf))
-Px <- Fx(yy)
-
-```
-
-
-```{r, eval=FALSE}
-M1 <- as(samp1[,1:10], 'data.table')
-M10 <- as(samp10[, 1:10], 'data.table')
-Mall <- rbind(M1, M10)
-Mp <- Mall[,{
-    val <- seq(0, 25, length.out=128)
-    cdf <- ecdf(value)
-    pdf <- density(value, from=min(val), to=max(val), n=128)
-    list(value, Pv=cdf(val), Dv=pdf$y)
-},keyby=list(PatientID, SafeCS, primerid, ncells)]
-
-cdf <- dcast.data.table(Mp, primerid + PatientID + SafeCS + value ~ ncells, value.var='Pv')
-
-ggplot(cdf[PatientID %like% '016|017|023|041',], aes(x=`1`, y=`10`, color=PatientID))+ facet_wrap(~primerid + SafeCS) + geom_point()
-
-##041 looks weird, repeat without
-M1 <- as(samp1, 'data.table')
-M10 <- as(samp10, 'data.table')
-Mall <- rbind(M1, M10)
-Mp <- Mall[PatientID %like% '016|017|023',{
-    val <- seq(0, 25, length.out=128)
-    cdf <- ecdf(value)
-    pdf <- density(value, from=min(val), to=max(val), n=128)
-    list(value=val, Pv=cdf(val), Dv=pdf$y)
-},keyby=list(SafeCS, primerid, ncells)]
-
-
-
-cdf <- dcast.data.table(Mp, primerid + SafeCS + value ~ ncells, value.var='Pv')
-ggplot(cdf[primerid < 'C'], aes(x=`1`, y=`10`))+ facet_wrap(~primerid + SafeCS) + geom_line()
-
-
-
-```
-
-
-
-```{r pairsPlot, fig.width=4, fig.height=4, dev='pdf'}
-opts_chunk$set(dev='CairoPNG')#, dev.args=list(useDingbats = FALSE))
-fl.sub <- samp1[c('CXCR4','CCR7', 'IL21R'),]
-ggpairs(as.data.frame(t(assay(fl.sub))), alpha=.5, upper=list(continuous='blank'))
-```
-
-```{r, eval=FALSE}
-cd <- as.data.table(rbind(cData(samp1), cData(samp10)))
-nobs <- cd[,.(N=.N), keyby=list(ncells, PatientID, SafeCS)]
-idcs <- nobs[ncells==10 & N>20, .(PatientID, SafeCS)]
-wids <- cd[idcs,wellKey,on=c('PatientID', 'SafeCS')]
-ss1 <- samp1[wids[wids %in% getwellKey(samp1)],]
-ss10 <- samp10[wids[wids %in% getwellKey(samp10)],]
-ssall <- combine(ss1, ss10)
-tocompare <- unique(nobs[idcs,.(ncells, PatientID, SafeCS, N),on=c('PatientID', 'SafeCS')])
-covs <- list()
-
-cov1fun <- function(ee, idx, n=10, base1=2, shift1=-1, base2=base1, shift2=shift1){
-    idx <- sample(idx, n)
-    ee <- ee[idx,]
-    nat <- base1^ee + shift1
-    cs <- log(colSums(nat)/n -shift2, base=base2)
-    cs
-}
-
-
-#what ncell, shift1, base1, shift2 and base2 minimize KL divergence?
-
-for(i in seq_len(nrow(tocompare)/2)){
-    tc <- tocompare[2*(i-1)+1,]
-    ee1 <- exprs(subset(ssall, ncells==1 & PatientID==tc$PatientID & SafeCS==tc$SafeCS))
-    ee10 <- exprs(subset(ssall, ncells==10 & PatientID==tc$PatientID & SafeCS==tc$SafeCS))
-    b <- boot(ee1, cov1fun, R=100, base1=2, shift1=0, base2=2, shift2=-1, n=12)
-    cc1 <- cov(b$t)
-    cc10 <- cov(ee10)
-    dc1 <- diag(cc1)
-    dc10 <- diag(cc10)
-    od1 <- cc1[upper.tri(cc1)]
-    od10 <- cc10[upper.tri(cc10)]
-    m1 <- colMeans(b$t)
-    m10 <- colMeans(ee10)
-    ## plot(od1, od10)
-    ## plot(dc1, dc10)
-    ## plot(m1, m10)
-    ## print(cor(dc1, dc10))
-    ## print(cor(od1, od10))
-    ## print(cor(m1, m10))
-    ## ks.test(ee10[
-}
-
-
-```
-
-```{r loadAlex, cache=FALSE}
+```{r loadAlex, cache=FALSE, eval=FALSE}
 if(!file.exists('alexNetworks_noattributes.rds')){
-    ll <- load('alexNetworks.RData')
     alex_fits_fl <- do.call(c, alex_fits)
     saveRDS(alex_fits_fl, 'alexNetworks_noattributes.rds')
-    rm(alex_fits)
 }
+rm(alex_fits)
 ```
 
-```{r plotAlexNet, fig.width=16, fig.height=16, dev=c('CairoPNG', 'pdf')}
-alex_fits_fl <- readRDS('alexNetworks_noattributes.rds')
+```{r plotAlexNet, fig.width=16, fig.height=16, dev=c('CairoPNG', 'pdf'), cache=FALSE}
+ll <- load('alexNetworks.RData')
+alex_fits_fl <- do.call(c, alex_fits)
+
 for(i in seq_along(alex_fits_fl)){
     genNetwork(alex_fits_fl[[i]], 1400, min.components=3, min.degree.label=1, main=names(alex_fits_fl)[i])
 } 
@@ -241,8 +75,6 @@ kable(BIC_all[,.(BICedges = edges[which.min(BIC)], maxEdges=max(edges)),keyby=li
 
 ```
 
-
-
 For mouse, these are derived from the go assocdb database, time stamp 20150919.
 ```{r goEdge, fig.width=15, fig.height=15, dev=c('CairoPNG', 'pdf')}
 ea <- lapply(alex_fits_fl, edgeGoAnno, n=1400, goAlias=godb, goTerm=goTerm, background=nullgo, nulldist=nedge1400perm) 
@@ -254,32 +86,35 @@ ealist[,rank:=rank(phyper, ties.method='average'), key=L1]
 setkey(ealist, L1, rank) 
 
 ealist.sig <- ealist[, {
-    fail <- min(min(which(pperm>.05)-1), .N)
+    fail <- min(min(which(pperm>.1)-1), .N)
     print(fail)
     .SD[seq_len(fail),]
 }, key=L1]
 
 ##ealist[,fdrThres:=rank/.N*.1, keyby=L1]
 ealist2 <- split(ealist.sig, ealist.sig$L1, drop=TRUE)
-terms1 <- c(regulated='PAM:***:1', regulated='LPS:***:1',
-           cytokine='GO:0060907',
+terms1 <- c(regulated='PAM:***:1', regulated='LPS:***:1',  regulated='LPS:***:-1',
+            cytokine='GO:0060907',
+            cytokine='GO:0004525',
             activation='GO:0001775', activation='GO:0050870',
             activation='GO:0001779', 
            chemotaxis='GO:0030595', chemotaxis='GO:0050921',
            chemotaxis='GO:0048247', chemotaxis='GO:0048246',
            RNA='GO:0044822', RNA='GO:0005657', RNA='GO:0061419', RNA='GO:1990440')
 terms2 <- c(RNA='GO:0001102', RNA='GO:0006388', RNA='GO:0003725',
-           endosome='GO:0000137', endosome='GO:0030140', endosome='GO:0005795', endosome='GO:0007030', endosome='GO:0005793', endosome='GO:0048237', endosome='GO:0005902', endosome='GO:1903078', endosome='GO:0030141',
+           endosome='GO:0000137', endosome='GO:0030140', endosome='GO:0005795', endosome='GO:0007030', endosome='GO:0005793', endosome='GO:0048237', endosome='GO:0005902', endosome='GO:1903078', endosome='GO:0030141', endosome='GO:0003796',
            endosome='GO:0005788', endosome='GO:0048237', endosome='GO:0030140', endosome='GO:0070062', endosome='GO:0005770',
            defense='GO:0050829', defense='GO:0002218', defense='GO:0032497',
-           defense='GO:0050729', defense='GO:0016064', defense='GO:0050830', 
+           defense='GO:0050729', defense='GO:0016064', defense='GO:0050830',
+           defense='GO:0004525', 
            chemokine='GO:2000343', chemokine='GO:0050715', chemokine='GO:0008009', 
            chemokine='GO:0045086', chemokine='GO:0071353', chemokine='GO:0045416',
             regulated='PAM:***:1', regulated='LPS:***:1')
 terms <- c(terms1, terms2)
 par(oma=c(0,0,0,0)+.1, mar=c(0,0,3, 0)+.1)
 plotgenesee(ealist2[[1]], godb, goTerm, network=alex_fits_fl[[names(ealist2)[1]]], data.table(GOID=terms, category=names(terms)), additionalGenes=c('MX1', 'CCL17', 'TAX1BP3', 'CCL3', 'MGL2', 'H2-AB1', 'H2-EB1', 'H2-AA', 'FABP5'))  
-plotgenesee(ealist2[[2]], godb, goTerm, network=alex_fits_fl[[names(ealist2)[2]]], data.table(GOID=terms, category=names(terms)), additionalGenes=c('MX1', 'CCL17', 'TAX1BP3', 'CCL3', 'MGL2', 'H2-AB1', 'H2-EB1', 'H2-AA', 'FABP5'))
+plotgenesee(ealist2[[2]], godb, goTerm, network=alex_fits_fl[[names(ealist2)[2]]], data.table(GOID=terms, category=names(terms)), additionalGenes=c('MX1', 'CCL17', 'TAX1BP3', 'CCL3', 'MGL2', 'H2-AB1', 'H2-EB1', 'H2-AA', 'FABP5'))  
+plotgenesee(ealist2[[3]], godb, goTerm, network=alex_fits_fl[[names(ealist2)[3]]], data.table(GOID=terms, category=names(terms)), additionalGenes=c('MX1', 'CCL17', 'TAX1BP3', 'CCL3', 'MGL2', 'H2-AB1', 'H2-EB1', 'H2-AA', 'FABP5'))
 
 
 ```
@@ -318,27 +153,85 @@ degreeGoAnno <- function(ginterp, n, godb, termdb, ...){
 
 ```
 
+# TFH data from Lausanne
 
-Loop over: data sets, methods and fixed factors
+```{r loadLausanne, cache=FALSE, eval=EVAL_TFH}
+loadLausanne()
+```
 
-```{r lausanne, eval=TRUE, cache=TRUE, message=FALSE}
+```{r dataExplain, results='asis',  eval=EVAL_TFH}
+dcast(as.data.frame(colData(fl)), PatientID+run~SafeCS+ncells)
+```
+
+```{r compare10cell, dev=c('CairoPNG', 'pdf'), fig.width=4, fig.height=4, eval=EVAL_TFH}
+library(lme4)
+concord <- getConcordance(samp10, samp1, groups=c('SafeCS'))
+ggplot(concord, aes(y=et.ref, x=et.comp))+geom_point()+geom_abline(slope=1, intercept=0) + xlab("log(1 cell average)") + ylab("log(10 cell average)") + theme_bw() + theme(legend.position=c(.8, .2)) + coord_cartesian(xlim=c(5, 23), ylim=c(5, 23))#+geom_text(aes(label=substr(primerid, 1, 2)), size=3)
+
+muLS <- lmer(et.ref~et.comp+ (1|primerid), data=concord)
+
+samp1HIV <- subset(samp1, SafeCS=='pp' & run=='HIV')
+samp10HIV <- subset(samp10, SafeCS=='pp' & run=='HIV')
+frqs <- data.table(freq1= freq(samp1HIV), freq10=freq(samp10HIV))
+
+#lm(log(1.01-freq10) ~ log(1.01-freq1), data=frqs)
+
+freqls <- nls(freq10 ~ 1-(1- B*freq1+A)^(10), data=frqs, start=list(B=1, A=0))
+
+summary(freqls)
+
+frqs[,resid:=resid(freqls, 'pearson')]
+frqs[,fitted:=predict(freqls)]
+frqs[,expected:= 1-(1- freq1)^(10)]
+
+ggplot(frqs, aes(x=freq1, y=freq10)) + geom_point()+ geom_line(aes(y=fitted, color='nls-fitted')) + geom_line(aes(y=expected, color='plugin')) + theme_bw() + xlab('Frequency 1 Cell')+ ylab('Frequency 10 Cell') + theme(legend.position=c(.8, .2))
+
+```
+
+
+```{r pairsPlot, fig.width=4, fig.height=4, dev='pdf', eval=EVAL_TFH}
+opts_chunk$set(dev='CairoPNG')#, dev.args=list(useDingbats = FALSE))
+fl.sub <- samp1[c('CXCR4','CCR7', 'IL21R'),]
+ggpairs(as.data.frame(t(assay(fl.sub))), alpha=.5, upper=list(continuous='blank'))
+```
+
+
+
+```{r lausanne, eval=EVAL_TFH, cache=TRUE, message=FALSE}
 ## manyfits: fit on all data, using 10 cell too
 ## mf2: concatenation of manyfits
 ## outFlat: matricized mf2
 ## manystab
 ll <- load('lausanneStability.RData')
-subs <- c(4, 5, 6)
-i <- 6
+subs <- c(3,4)
+i <- 4
 
 
 thisstab <- setNames(manystab[[i]], c('hurdle', 'guassian', 'logistic', 'gaussian10'))
 
-lapply(unlist(manystab[subs], recursive=F), function(x) c(sum(x>.01), sum(x>.5), sum(x>.6), sum(x>.7), sum(x>.8)))
+lapply(unlist(manystab[subs], recursive=F), function(x) c(sum(x>.01), sum(x>.5), sum(x>.6), sum(x>.7), sum(x>.8), sum(x>.9)))
+
+```
+
+## BIC Comparison
+
+```{r BICplot}
+BIC_all <-  rbindlist(lapply(seq_along(outFlat), function(i){
+    x <- mf2[[i]]
+    data.frame(edges=x$trueEdges, BIC=x$BIC, method=names(outFlat)[[i]])
+}))
+
+ggplot(BIC_all, aes(x=edges, y=BIC, color=method))+geom_line()
+```
+
+```{r, results='asis'}
+kable(BIC_all[,.(BICedges = edges[which.min(BIC)], maxEdges=max(edges)),keyby=list(method)])
+
 
 ```
 
 
-```{r plotTfh, fig.width=16, fig.height=16, dev=c('CairoPNG', 'pdf')}
+```{r plotTfh, fig.width=16, fig.height=16, dev=c('CairoPNG', 'pdf'), eval=EVAL_TFH}
 
 matplotNetwork <- function(plotitems, nedge=70, min.components=0, min.degree.label=-1, matplot=TRUE, ...){
     g1 <- genNetwork(plotitems[[1]], nedge=nedge, min.components=min.components,  plot=F, ...)
@@ -358,29 +251,23 @@ matplotNetwork <- function(plotitems, nedge=70, min.components=0, min.degree.lab
 
 matplotNetwork(mf2[,'ngo:Healthy'], 114) 
 matplotNetwork(mf2[,'patient:Healthy'], 90)
-matplotNetwork(mf2[,'SafeCS:Healthy'], nedge=70, matplot=TRUE, colorbar=F)
-#matplotNetwork(mf2[,'ngo:HIV'])
-matplotNetwork(mf2['hurdle', c('SafeCS:TFH016', 'SafeCS:TFH017', 'SafeCS:TFH023', 'SafeCS:TFH041')])
-matplotNetwork(mf2['gaussian', c('SafeCS:TFH016', 'SafeCS:TFH017', 'SafeCS:TFH023', 'SafeCS:TFH041')])
-matplotNetwork(mf2['gaussian10', c('SafeCS:TFH016', 'SafeCS:TFH017', 'SafeCS:TFH023', 'SafeCS:TFH041')])
+matplotNetwork(mf2[,'ngo:HIV'])
 
 ```
 
-```{r plotTfhHIV, dev=c('CairoPNG', 'pdf'), fig.width=6, fig.height=6}
+```{r plotTfhHIV, dev=c('CairoPNG', 'pdf'), fig.width=6, fig.height=6, eval=EVAL_TFH}
 matplotNetwork(c(mf2[,'patient:HIV'], mf2['hurdle', 'patient:Healthy']), matplot=FALSE, colorbar=F)
 
 ```
 
-```{r plotTfhHealthy, dev=c('CairoPNG', 'pdf'), fig.width=6, fig.height=6}
+```{r plotTfhHealthy, dev=c('CairoPNG', 'pdf'), fig.width=6, fig.height=6, eval=EVAL_TFH}
 matplotNetwork(mf2[,'patient:Healthy'], nedge=44, matplot=FALSE, colorbar=F)
 
 gn <- genNetwork(mf2[['gaussian', 'patient:Healthy']], nedge=44, plot=F)
 
 ```
 
-
-
-```{r plotTfhComp, dev=c('CairoPNG', 'pdf'), fig.width=6, fig.height=6}
+```{r plotTfhComp, dev=c('CairoPNG', 'pdf'), fig.width=6, fig.height=6, eval=FALSE}
 result <- mf2[['hurdle', 'patient:HIV']]$paths
 lall <- list(G=neighborhoodToArray(result, summaryFun=summaryG),
      Hij=neighborhoodToArray(result, summaryFun=summaryHij),
@@ -407,6 +294,7 @@ gn <- colnames(lall[[4]][[1]][[70]])[ij]
 ggpairs(exprs(samp1HIV[,gn]), upper=list(continuous='hmosaic'), lower=list(continuous='hurdle'))
 
 ```
+Looking at canonical marginal coexpression patterns
 
 
 ```{r crossCor, dev=c('CairoPNG', 'pdf')}
@@ -445,7 +333,7 @@ pairwiseStab <- function(outli){
 
 }
 
-subsets <- list('SafeCS:Healthy', 'patient:Healthy', 'ngo:Healthy')
+subsets <- list('patient:Healthy', 'ngo:Healthy')
 
 pwh <- lapply(subsets, function(x){
     rbindlist(pairwiseHamming(outFlat[names(outFlat) %like% x]))
@@ -457,33 +345,33 @@ pwh400 <- pwh[edges<100 & edges > 60 & L1 %like% 'patient:Healthy', list(dissimi
 pwh400[dissimilarity<.001, dissimilarity:=NA_real_]
 ggplot(pwh400, aes(x=L1, y=L2, fill=dissimilarity))+geom_tile()
 
-
 ```
+Dissimilarities
 
 
 
 ```{r hurdlePlot, dev=c('CairoPNG', 'pdf')}
 genes <- c('Lck', 'NFATC1',
            'ANP32B', 'IL21', 'ITGAL')
-ee <- exprs(samp1HIV[,genes])
-ggpairs(ee, lower=list(continuous='hurdle'), upper=list(continuous='hmosaic'))+theme_bw()
+ee <- exprs(samp1HIV[genes,])
+ggpairs(as.data.frame(ee), lower=list(continuous='hurdle'), upper=list(continuous='hmosaic'))+theme_bw()
 
 samp1HltPP <- subset(samp1, run=='Healthy' & SafeCS%in% c('nn', 'pp'))
 samp10HltPP <- subset(samp10, run=='Healthy' & SafeCS %in% c('pp', 'nn'))
-samp1HltP <- subset(samp1, run=='Healthy' & SafeCS=='CXCR5p')[, c('BcL6', 'CXCR5', 'PDCD1')]
+samp1HltP <- subset(samp1, run=='Healthy' & SafeCS=='CXCR5p')[c('BcL6', 'CXCR5', 'PDCD1'),]
 
 #ggpairs(exprs(samp1HltPP[,c('BcL6', 'PDCD1', 'CXCR5')]),  lower=list(continuous='hurdle'), upper=list(continuous='hmosaic'))+theme_bw()
 #ggpairs(exprs(samp10HltPP),  lower=list(continuous='hurdle'), upper=list(continuous='hmosaic'))+theme_bw()
-ggpairs(exprs(samp1HltP),  lower=list(continuous='hurdle'), upper=list(continuous='hmosaic'))+theme_bw()
+ggpairs(as.data.frame(exprs(samp1HltP)),  lower=list(continuous='hurdle'), upper=list(continuous='hmosaic'))+theme_bw()
 
-mbcl6 <- glm(I(BcL6>0) ~ I(CASP1>0) + I(NFATC1>0) +I(Blimp1>0) + I(CD154>0), data=data.frame(exprs(samp1HltPP), cData(samp1HltPP)), family='binomial')
+mbcl6 <- glm(I(BcL6>0) ~ I(CASP1>0) + I(NFATC1>0) +I(Blimp1>0) + I(CD154>0), data=data.frame(exprs(samp1HltPP), colData(samp1HltPP)), family='binomial')
 mil21 <- glm(I(IL21>0) ~ I(CASP1>0) + I(NFATC1>0) + I(BcL6>0), data=data.frame(exprs(samp1HltPP)), family='binomial')
 
-cd <- cData(samp1HltPP)
+cd <- colData(samp1HltPP)
 cd$PatientID <- factor(cd$PatientID)
 contrasts(cd$PatientID) <- 'contr.sum'
 cd$SafeCS <- relevel(factor(cd$SafeCS), 'nn')
-cd -> cData(samp1HltPP)
+cd -> colData(samp1HltPP)
 
 zz1 <- zlm(~PatientID + SafeCS+ngeneson, samp1HltPP, method='bayesglm', ebayes=T)
 zzR <- zlm(~PatientID, samp1HltPP, hook=MAST:::residualsHook, method='bayesglm', ebayes=T)
@@ -514,6 +402,135 @@ ggp
 
 ggpairs(resid_mat, columns=3:6,  lower=list(continuous='hurdle'), upper=list(continuous='hmosaic'), mapping=aes(color=CellSubset)) + theme_bw()
 cor(resid_mat[,3:6,with=F])
+
+
+```
+
+
+## Some old code looking at linearity of second moments
+
+```{r testCDRTrans, eval=FALSE}
+x <- rnorm(1000)
+Fx <- ecdf(x)
+x2 <- rnorm(1000)
+y <- x2^2
+Fy <- ecdf(y)
+yy <- seq(-1, 1, by=.1)
+Py <- Fy(yy)
+Pxy <- Fx(ifelse(yy>0, sqrt(yy), -Inf))-Fx(ifelse(yy>0, -sqrt(yy), -Inf))
+Px <- Fx(yy)
+
+```
+
+
+```{r, eval=FALSE}
+
+M <- as(samp1, 'data.table')
+
+varfun <- function(value, n0=0, nu0=0, tau20=0, pi0=0){
+    ee<- 2^value-1
+    n <- sum(value>0)
+    nu <- (mean(ee[value>0])*n+nu0*n0)/(n+n0)
+    tau2 <- (var(ee[value>0])*n+tau20*n0)/(n+n0)
+    pi <- (mean(value>0)*length(value)+pi0*n0)/(length(value)+n0)
+    list(n=n, nu=nu, tau2=tau2, pi=pi, var10exp=(nu^2*(1-pi)+tau2)/(nu^2*pi))
+}
+
+varall <- M[,varfun(value),keyby=list(primerid, PatientID, SafeCS)]
+varp <- M[,varfun(value),keyby=list(primerid, SafeCS)]
+setnames(varp, c('nu', 'tau2', 'pi'), c('nu0', 'tau20', 'pi0'))
+varp[,':='(n=NULL, var10exp=NULL, n0=10)]
+M <- M[varp,,on=c('primerid', 'SafeCS')]
+varallshrink <- M[,varfun(value, n0=4, nu0=nu0[1], tau20=tau20[1], pi0=pi0[1]), keyby=list(primerid, PatientID, SafeCS)]
+
+
+vari <- M[,varfun(value), keyby=list(PatientID)]
+vars <- M[,varfun(value), keyby=list(SafeCS)]
+
+var10 <- as(samp10, 'data.table')
+var10 <- var10[,list(var10emp=var(value)), keyby=list(primerid, PatientID, SafeCS)]
+vv <- var10[varall,,on=c('primerid', 'PatientID', 'SafeCS')]
+with(vv, plot(var10emp, var10exp))
+with(vv, cor(var10emp, var10exp, use='complete'))
+
+M1 <- as(samp1[,1:10], 'data.table')
+M10 <- as(samp10[, 1:10], 'data.table')
+Mall <- rbind(M1, M10)
+Mp <- Mall[,{
+    val <- seq(0, 25, length.out=128)
+    cdf <- ecdf(value)
+    pdf <- density(value, from=min(val), to=max(val), n=128)
+    list(value, Pv=cdf(val), Dv=pdf$y)
+},keyby=list(PatientID, SafeCS, primerid, ncells)]
+
+cdf <- dcast.data.table(Mp, primerid + PatientID + SafeCS + value ~ ncells, value.var='Pv')
+
+ggplot(cdf[PatientID %like% '016|017|023|041',], aes(x=`1`, y=`10`, color=PatientID))+ facet_wrap(~primerid + SafeCS) + geom_point()
+
+##041 looks weird, repeat without
+M1 <- as(samp1, 'data.table')
+M10 <- as(samp10, 'data.table')
+Mall <- rbind(M1, M10)
+Mp <- Mall[PatientID %like% '016|017|023',{
+    val <- seq(0, 25, length.out=128)
+    cdf <- ecdf(value)
+    pdf <- density(value, from=min(val), to=max(val), n=128)
+    list(value=val, Pv=cdf(val), Dv=pdf$y)
+},keyby=list(SafeCS, primerid, ncells)]
+
+
+
+cdf <- dcast.data.table(Mp, primerid + SafeCS + value ~ ncells, value.var='Pv')
+ggplot(cdf[primerid < 'C'], aes(x=`1`, y=`10`))+ facet_wrap(~primerid + SafeCS) + geom_line()
+
+
+
+```
+
+
+```{r, eval=FALSE}
+cd <- as.data.table(rbind(colData(samp1), colData(samp10)))
+nobs <- cd[,.(N=.N), keyby=list(ncells, PatientID, SafeCS)]
+idcs <- nobs[ncells==10 & N>20, .(PatientID, SafeCS)]
+wids <- cd[idcs,wellKey,on=c('PatientID', 'SafeCS')]
+ss1 <- samp1[wids[wids %in% getwellKey(samp1)],]
+ss10 <- samp10[wids[wids %in% getwellKey(samp10)],]
+ssall <- combine(ss1, ss10)
+tocompare <- unique(nobs[idcs,.(ncells, PatientID, SafeCS, N),on=c('PatientID', 'SafeCS')])
+covs <- list()
+
+cov1fun <- function(ee, idx, n=10, base1=2, shift1=-1, base2=base1, shift2=shift1){
+    idx <- sample(idx, n)
+    ee <- ee[idx,]
+    nat <- base1^ee + shift1
+    cs <- log(colSums(nat)/n -shift2, base=base2)
+    cs
+}
+
+
+#what ncell, shift1, base1, shift2 and base2 minimize KL divergence?
+
+for(i in seq_len(nrow(tocompare)/2)){
+    tc <- tocompare[2*(i-1)+1,]
+    ee1 <- exprs(subset(ssall, ncells==1 & PatientID==tc$PatientID & SafeCS==tc$SafeCS))
+    ee10 <- exprs(subset(ssall, ncells==10 & PatientID==tc$PatientID & SafeCS==tc$SafeCS))
+    b <- boot(ee1, cov1fun, R=100, base1=2, shift1=0, base2=2, shift2=-1, n=12)
+    cc1 <- cov(b$t)
+    cc10 <- cov(ee10)
+    dc1 <- diag(cc1)
+    dc10 <- diag(cc10)
+    od1 <- cc1[upper.tri(cc1)]
+    od10 <- cc10[upper.tri(cc10)]
+    m1 <- colMeans(b$t)
+    m10 <- colMeans(ee10)
+    ## plot(od1, od10)
+    ## plot(dc1, dc10)
+    ## plot(m1, m10)
+    ## print(cor(dc1, dc10))
+    ## print(cor(od1, od10))
+    ## print(cor(m1, m10))
+    ## ks.test(ee10[
+}
 
 
 ```

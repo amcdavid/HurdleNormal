@@ -66,7 +66,7 @@ plt
 
 ```{r overall}
 overall_plot <- ggplot(oracles[oracle=='FDR' & N==100 & P!=24 & type !='ecoli'], aes(y=sensitivity, color=L1, lty=factor(kcell))) + facet_wrap(~type, scales='free_y') + ylab('Sensitivity') +geom_line() + scale_linetype('# Cells')  + guides(colour = "none")
-dim_scale_plt <- overall_plot+aes(x=P)+ xlab('M')+ ggtitle("FDR oracle tuning: dimensional scaling") + guides(colour='none', linetype='none')
+dim_scale_plt <- overall_plot+aes(x=P)+ xlab('M')+ ggtitle("FDR oracle tuning: dimensional scaling")
 ecoli_plt <- overall_plot %+% oracles[oracle=='FDR' & type =='ecoli'& contam=='none']+ aes(x=N) + geom_line() + ggtitle("Sample size") +ylab(NULL) 
 
 ```
@@ -88,7 +88,8 @@ roclike[,.(medianSD_FDR=median(sdFDR, na.rm=TRUE),
 bic <- fi[oracle=='BIC',.(FDR=median(FDR), sensitivity=median(sensitivity)), key=key(roclike)]
 
 
-ggplot(roclike, aes(x=FDR, y=sensitivity, color=L1))+geom_path() + facet_wrap(~type + contam+N, labeller=label_singleline, scales='free_y') + geom_point(data=bic, pch=9)
+roclike_plt <- ggplot(roclike, aes(x=FDR, y=sensitivity, color=L1))+geom_path() + facet_wrap(~type + contam+N, labeller=label_singleline, scales='free_y') + scale_color_discrete('Method') + ggtitle('Sensitivity vs FDR')
+roclike_plt+ geom_point(data=bic, pch=9)
 ```
 
 ```{r eval=FALSE}
@@ -117,6 +118,14 @@ p <- ggplot(collectFDR[Method %in% c('Anisometric', 'Isometric', 'Logistic', 'Ga
 ```
 
 ```{r draw_plots, fig.width=12, fig.height=12}
-ggdraw() + draw_plot(dim_scale_plt, y=.65, height=.35, width=.6)+ draw_plot(ecoli_plt, y=.65, x=.6, height=.35, width=.4) + draw_plot(bic_plt, height=.65) + draw_plot_label(c('A', 'B', 'C'), c(0, .6, 0), c(1, 1, .65))
+ggdraw() + draw_plot(dim_scale_plt+ guides(colour='none', linetype='none'), y=.65, height=.35, width=.6)+ draw_plot(ecoli_plt, y=.65, x=.6, height=.35, width=.4) + draw_plot(bic_plt, height=.65) + draw_plot_label(c('A', 'B', 'C'), c(0, .6, 0), c(1, 1, .65))
 ggsave('./simulations_multipanel.pdf', height=10, width=8)
+```
+
+```{r draw_subset, dev=c('png', 'pdf'), fig.width=5, fig.height=3}
+dim_scale_plt %+% oracles[oracle=='FDR' & N==100 & P!=24 & type  != 'ecoli'] + scale_color_discrete('Method') + guides(colour = 'legend') + theme(legend.position='bottom')
+```
+
+```{r draw_subset_roclike, dev=c('png', 'pdf'), fig.width=5, fig.height=5}
+roclike_plt %+% roclike[contam=='none'] + geom_point(data=bic[contam=='none'], pch=9) + theme(legend.position='bottom')
 ```

@@ -1,18 +1,19 @@
 ## sbatch -n1 -c16 -t1-01 R --vanilla -f fitAlex.R
 source('common.R')
-load(system.path('data-raw', 'shalek.RData', package='HurdleNormal'))
+load(system.file('data-raw', 'shalek.RData', package='HurdleNormal'))
 sca_alex <- with(shalek, FromMatrix(exprs, cData, fData))
+lps_pam_freq <- freq(MAST::subset(sca_alex, Time =='2h' & Stim %in% c('LPS', 'PAM')))
 astim <- MAST::subset(sca_alex, Stim=='LPS' & Time=='2h')
-astim <- astim[freq(astim)>.3,]
+astim <- astim[lps_pam_freq>.3,]
 
 ## Fit networks
 alex_fits <- list()
 parallel=TRUE
 
-alex_fits[['regLPS']] <- fitSomeModels(astim,  lambda.min.ratio=.4, nlambda=50, control=list(tol=5e-3, maxrounds=80, FISTA=FALSE, debug=0, newton0=TRUE), parallel=parallel, checkpointDir='alex2hlps_chk')
+alex_fits[['regLPS']] <- fitSomeModels(astim,  lambda.min.ratio=.4, nlambda=70, control=list(tol=5e-3, maxrounds=80, FISTA=FALSE, debug=0, newton0=TRUE), parallel=parallel, checkpointDir='alex2hlps_chk', keepNodePaths=FALSE)
 gc()
 
-alex_fits[['ngoLPS']] <- fitSomeModels(astim,  lambda.min.ratio=.4, nlambda=50, control=list(tol=5e-3, maxrounds=80, FISTA=FALSE, debug=0, newton0=TRUE), parallel=parallel, checkpointDir='alex2hlps_ngo_chk', fixed=cbind(1, scale(colData(astim)$ngeneson)))
+alex_fits[['ngoLPS']] <- fitSomeModels(astim,  lambda.min.ratio=.4, nlambda=70, control=list(tol=5e-3, maxrounds=80, FISTA=FALSE, debug=0, newton0=TRUE), parallel=parallel, checkpointDir='alex2hlps_ngo_chk', fixed=cbind(1, scale(colData(astim)$ngeneson)), keepNodePaths=FALSE)
 gc()
 
 
