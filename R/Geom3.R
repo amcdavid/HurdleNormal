@@ -57,6 +57,12 @@ stat_hurdle1d <- function(mapping = NULL, data = NULL, geom = "segment",
 ##' @param ... passed to stat_hurdle1d
 ##' @return plot
 ##' @importFrom ggplot2 aes_string geom_rect ggplot scale_x_continuous scale_y_continuous geom_line geom_point aes
+##' @examples
+##' data(shalek2014)
+##' toplot <- t(shalek2014_list$exprs)[,c('MGL2', 'MX1', 'MALAT1')]
+##' GGally::ggpairs(as.data.frame(toplot),
+##' upper=list(continuous=ggally_hurdle),
+##' lower=list(continuous=ggally_hmosaic))
 ##' @export
 ggally_hurdle <- function(data, mapping, lwd.regression=1, lwd.axis=2, size.point=1, ...){
     p <- ggplot(data, mapping)+geom_point(size=size.point, ...)+stat_hurdle1d(vars='x', lwd=lwd.axis, color='red', ...)+stat_hurdle1d(vars='y', lwd=lwd.axis, color='red', ...)+stat_hurdle2d(lwd=lwd.regression, color='blue', ...)
@@ -65,9 +71,12 @@ ggally_hurdle <- function(data, mapping, lwd.regression=1, lwd.axis=2, size.poin
     p
                   }
 
+
+##' @describeIn ggally_hurdle plot pairwise mosaic plots
+##' @export
 ggally_hmosaic <- function(data, mapping, ...){
-    var1 <- (data[,deparse(mapping$x)]>0)*1
-    var2 <- (data[,deparse(mapping$y)]>0)*1
+    var1 <- (abs(data[,deparse(mapping$x)])>0)*1
+    var2 <- (abs(data[,deparse(mapping$y)])>0)*1
     nm1 <- names(data)[2]
     nm2 <- names(data)[1]
     jointTable <- prop.table(table(var1, var2))
