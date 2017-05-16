@@ -1,7 +1,8 @@
 *~
 #*#
 .Rhistory
-inst/doc
+inst/doc/
+!inst/doc/singlecell-networks.html
 .DS_Store
 .emacs.desktop
 .Rproj.user
