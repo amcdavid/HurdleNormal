@@ -2,7 +2,8 @@
 % Please edit documentation in R/ProcessNeighborhoods.R
 \name{neighborhoodToArray}
 \alias{neighborhoodToArray}
-\title{Convert neighborhood estimates fit on differing lambda paths into adjacency matrices}
+\alias{print.HurdleNormalFit}
+\title{neighborhoodToArray}
 \usage{
 neighborhoodToArray(pathList, nknots, vnames = NULL,
   summaryFun = summarySignedL1, nobs, self_edges = FALSE)
@@ -24,5 +25,11 @@ neighborhoodToArray(pathList, nknots, vnames = NULL,
 list of (sparse) adjacency matrices, the number of non-zero elements (edges, before enforcing symmetry) for each matrix, the lambda for each matrix, the non-penalized, refitted pseudo log-likelihood, the number of parameters per edge, and the BIC
 }
 \description{
+Convert neighborhood estimates fit on differing lambda paths into adjacency matrices
+}
+\details{
 Join a series of paths fit node-wise into a list of adjacency matrices.
+}
+\seealso{
+fitHurdle, autoGLM, interpolateEdges
 }

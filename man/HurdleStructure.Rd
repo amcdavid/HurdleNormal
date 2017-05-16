@@ -21,7 +21,7 @@ HurdleStructure(G = NULL, H = NULL, K = NULL, sample = NULL,
 
 \item{estimate}{optional estimated coefficients (replaces provided \code{G}, \code{H}, \code{K} if provided).}
 
-\item{gibbs_args}{list of arguments passed to \link{\code{getGibbs}}}
+\item{gibbs_args}{list of arguments passed to \code{\link{getGibbs}}}
 }
 \value{
 \code{list} with the above components

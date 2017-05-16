@@ -7,11 +7,10 @@
 ##' @param scale scale design matrix
 ##' @param conditionalCenter in positive predictors, center only the non-zero components
 ##' (design matrix will still be centered, and orthogonal to indicators)
-##' @param ... ignored
 ##' @param tol tolerance for declaring a parameter equal to zero
 ##' @return design matrix, with attribute fixedCols giving indices of unpenalized intercept columns. Each gene appears in adjacent columns with its continuous component first, followed by its binarization.
 ##' @export
-makeModel <- function(zif, nodeId, fixed=NULL, center=TRUE, scale=FALSE, conditionalCenter=TRUE, ..., tol=.001){
+makeModel <- function(zif, nodeId, fixed=NULL, center=TRUE, scale=FALSE, conditionalCenter=TRUE, tol=.001){
     nonZ <- not_zero(zif, tol)
     if(conditionalCenter){
         for(i in seq_len(ncol(zif))){

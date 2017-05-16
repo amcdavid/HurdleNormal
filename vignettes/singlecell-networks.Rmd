@@ -16,7 +16,8 @@ The inference of patterns of association, and perhaps ultimately cause and effec
 Markov graphical models have been a popular method to describe association relationships between genes in bulk gene expression experiments.
 Each gene is a node in a graph, and the absence of an edge connecting two indicates an absence of a regulatory link.^[More precisely, a conditional independence in expression.]
 
-[Example of a graph here.  Indirect vs direct effects.]
+!(example_graph.png)[A graph and its probability distribution.
+C directly affects A, but not D.]
 
 Bulk gene expression experiments relied on aggregations of thousands of cells to measure the average expression in an organism.
 Advances in microfluidic and droplet sequencing now permit expression profiling in single cells.
@@ -74,23 +75,89 @@ testBinaryIndependence(z, x0=10, r=5)
 The infamous case in which graphical structure commutes under convolution is when the $\bY_i$ are multivariate Normal. 
 But single cell gene expression is zero-inflated, and not plausibly described by a multivariate Normal distribution.   
 
-### Zero-inflated expression
+## An example of fitting the network
 ```{r}
-data(shalek)
-logExpression1h = t(shalek$exprs[,shalek$cData$Time=='1h'])
+library(stringr)
+library(GGally)
+library(ggplot2)
+data(shalek2014)
+allgenes <- rownames(shalek2014_list$exprs)
+set.seed(1234)
+genes <- c('MGL2', 'MX1', str_subset(allgenes, 'H2-'), sample(allgenes, 30))
+
+logExpression1h = t(shalek2014_list$exprs)[,genes]
+##ggpairs doesn't like non-syntactic colnames
+colnames(logExpression1h) <- make.names(colnames(logExpression1h)) 
+## logExpression1h = t(shalek2014_list$exprs) #Uncomment to run on full dataset
+ggpairs(as.data.frame(logExpression1h[,c('MGL2', 'MX1', 'H2.AA')]),upper=list(continuous=ggally_hurdle), lower=list(continuous=ggally_hmosaic))
 ```
-One reason to 
+The data, originally published in [Shalek, et al 2014](http://www.nature.com/doifinder/10.1038/nature13437), are already thresholded using [MAST](http://bioconductor.org/packages/release/bioc/html/MAST.html).
+We consider the subset of the data collected post one hour stimulation
+with LPS.
 
 
-## Fit the network
-The edges are discovered by fitting a glorified regression model gene by gene.
+```{r}
+exp1h_trans <- conditionalCenter(logExpression1h)
+ggpairs(as.data.frame(exp1h_trans[,c('MGL2', 'MX1', 'H2.AA')]),upper=list(continuous=ggally_hurdle), lower=list(continuous=ggally_hmosaic))
+```
+Conditionally centering the non-zero values in the data makes the discrete and continuous
+components orthogonal.
+This does change the problem slightly, but improves the geometry of
+the log-likelihood, significantly speeding convergence.
+
+
+The edges are discovered by fitting a vector regression model gene by gene.
 Because it is a regression, it's easy to add covariates.
 In this case, we adjust for the cellular detection rate.
-```{r}
+```{r, results='hide', message=FALSE}
 #options(mc.cores=4) #or however many your system has
-covariates = cbind(1, scale(subset(shalek$cData, Time=='1h')$ngeneson))
+covariates = cbind(1, scale(shalek2014_list$cdata$ngeneson))
 #This argument only fits the first 10 genes so that the vignette compiles in a reasonable fashion.
-#Leave it unset otherwise (or you can use it to parallelize across clusters)
-indices=c(1:10, 21:30)
-fitted = fitHurdle(logExpression1h,  fixed=covariates, parallel=TRUE, indices = indices, control=list(debug=0))
+#Leave it unset otherwise (or you can use it to parallelize across clusters) 
+hurdle_fit = fitHurdle(exp1h_trans,  fixed=covariates, parallel=FALSE, control=list(debug=0))
 ```
+
+```{r}
+print(hurdle_fit)
+```
+The hurdle_fit graph object contains a list of `r length(hurdle_fit$adjMat)`
+adjacency matrices and vectors summarizing the number of edges
+`trueEdges`, penalty parameters `lambda`, unpenalized pseudo
+log-likelihood (the sum of unpenalized conditional log-likelihoods),
+parameter count per edge, and the Bayesian information criterion (`BIC`).
+
+### Model selection and complexity
+```{r}
+BIC_etc <- hurdle_fit$BIC_etc
+BIC_etc[BIC>=max(BIC),isMax:=TRUE][,idx:=.I]
+lambda_axis <- with(BIC_etc, approxfun(trueEdges, lambda))
+ggplot(data=BIC_etc, aes(x=trueEdges, y=BIC))+geom_line() + geom_vline(data=BIC_etc[isMax==TRUE,], aes(xintercept=trueEdges))
+```
+
+We can plot the Bayesian information criterion as a function of the
+number of edges.  Based on simulations, it seems to overselect in "small
+samples" (however that is defined), so probably only provides an upper
+bound on the number of edges that you would want to report.
+
+## Plot the network
+```{r, fig.height=8, fig.width=8, results='hide'}
+library(igraph)
+edge_bic <- seq(10, BIC_etc[isMax==TRUE,trueEdges], length.out=4)
+graph_seq <- BIC_etc[.(trueEdges=edge_bic),,on='trueEdges', roll=TRUE]
+graphs_to_plot <- lapply(graph_seq[,idx], function(i){
+    graph.adjacency(abs(hurdle_fit$adjMat[[i]])>0, mode='max')
+})
+
+lapply(graphs_to_plot, function(g) hn_plot(g, main=sprintf("Graph on %d edges", sum(degree(g))/2)))
+```
+
+## Extensions
+* Other **network-selection** methods (Gaussian or Logistic-based) are
+available with `?autoGLM.`
+* **Stability selection** is available with `?stability` and
+`?collectStability`
+* **Simulate** from fitted models with `?HurdleStructure`
+* **Differential coexpression**. Most of the infrastructure is in place to use these procedures to look for
+  differential coexpression graphs, but code defining the parameter
+  blocks is not yet implemented.  See `?makeModel` and `?Blocks` for
+  the functions that would need to be overrided and used.

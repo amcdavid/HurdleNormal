@@ -3,3 +3,4 @@ die.R
 ^data-raw$
 ^.*\.Rproj$
 ^\.Rproj\.user$
+inst/vignette2/

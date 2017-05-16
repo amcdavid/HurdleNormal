@@ -5,7 +5,7 @@
 \title{Generate a design matrix corresponding to the 2-1-0 hurdle}
 \usage{
 makeModel(zif, nodeId, fixed = NULL, center = TRUE, scale = FALSE,
-  conditionalCenter = TRUE, ..., tol = 0.001)
+  conditionalCenter = TRUE, tol = 0.001)
 }
 \arguments{
 \item{zif}{zero-inflated covariates}
@@ -20,8 +20,6 @@ makeModel(zif, nodeId, fixed = NULL, center = TRUE, scale = FALSE,
 
 \item{conditionalCenter}{in positive predictors, center only the non-zero components
 (design matrix will still be centered, and orthogonal to indicators)}
-
-\item{...}{ignored}
 
 \item{tol}{tolerance for declaring a parameter equal to zero}
 }

@@ -2,10 +2,13 @@
 % Please edit documentation in R/Geom3.R
 \name{ggally_hurdle}
 \alias{ggally_hurdle}
+\alias{ggally_hmosaic}
 \title{Wrapper so ggally can use \code{geom_hurdle}}
 \usage{
 ggally_hurdle(data, mapping, lwd.regression = 1, lwd.axis = 2,
   size.point = 1, ...)
+
+ggally_hmosaic(data, mapping, ...)
 }
 \arguments{
 \item{data}{data in which plot is evaluated}
@@ -25,4 +28,16 @@ plot
 }
 \description{
 Wrapper so ggally can use \code{geom_hurdle}
+}
+\section{Functions}{
+\itemize{
+\item \code{ggally_hmosaic}: plot pairwise mosaic plots
+}}
+
+\examples{
+data(shalek2014)
+toplot <- t(shalek2014_list$exprs)[,c('MGL2', 'MX1', 'MALAT1')]
+GGally::ggpairs(as.data.frame(toplot),
+upper=list(continuous=ggally_hurdle),
+lower=list(continuous=ggally_hmosaic))
 }

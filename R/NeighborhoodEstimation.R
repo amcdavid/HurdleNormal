@@ -111,11 +111,11 @@ globalVariables(c('penalty.scale.lambda', 'paridx', 'mmidx', 'block'))
 ##' @import data.table
 ##' @import Matrix
 ##' @describeIn fitHurdle Fit an auto-model (Ising or Gaussian) to \code{samp} using glmnet.  checkpointDir is currently ignored.
-##' @param nlambda number of lambda values on grid (default 200)
+##' @param nlambda number of lambda values on grid (default 200).
 ##' @param lambda.min.ratio minimum lambda ratio (as a function of lambda0, where the first predictor enters; default .1)
 ##' @param family in the case of \code{autoGLM} one of "gaussian" or "logistic"
 ##' @aliases autoLogistic
-autoGLM <- function(samp, fixed=NULL, parallel=FALSE, keepNodePaths=FALSE, checkpointDir, nlambda=200, lambda.min.ratio=.1, family='binomial'){
+autoGLM <- function(samp, fixed=NULL, parallel=FALSE, keepNodePaths=FALSE, checkpointDir = 'ignored', nlambda=200, lambda.min.ratio=.1, family='binomial'){
     if(is.null(colnames(samp))) colnames(samp) <- seq_len(ncol(samp))
     samp0 <- if(family=='binomial') (abs(samp)>0)*1 else samp
     applyfun <- if(parallel) function(X, FUN) parallel::mclapply(X, FUN, mc.preschedule=TRUE) else lapply
@@ -203,11 +203,12 @@ conditionalCenter <- function(samp) {
 ##' @param fixed data.frame of fixed covariates (to be conditioned upon)
 ##' @param parallel parallelize over variables using "mclapply"?
 ##' @param keepNodePaths return node-wise output (solution paths and diagnostics for each node) as attribute `nodePaths`
-##' @param checkpointDir (optional) directory to save the fit of each gene, useful for large problems.  If it exists, then completed genes will be automatically loaded.
+##' @param checkpointDir (optional) directory to save the fit of each node, useful for large problems.  If it exists, then completed nodes will be automatically loaded.
 ##' @param makeModelArgs (optional) arguments passed to the model matrix function
 ##' @param indices (optional) subset of indices to fit, useful for cluster parallelization.
 ##' @param ... passed to cgpaths
 ##' @return list of fits, one per coordinate and an attribute "timing"
+##' @seealso neighborhoodToArray, autoGLM, interpolateEdges
 ##' @export
 fitHurdle <- function(samp, fixed=NULL, parallel=TRUE, keepNodePaths=FALSE, checkpointDir=NULL, makeModelArgs=NULL,  indices, ...){
     applyfun <- if(parallel) function(X, FUN) parallel::mclapply(X, FUN, mc.preschedule=FALSE) else lapply
@@ -275,7 +276,7 @@ setupStabilityIndex <- function(obs, strata=rep(1, nrow(obs)), B=50, seed=12345)
 ##' Exceptions are caught and output saved to disk since this can be quite computationally expensive.
 ##' @param obs a matrix of observations from which rows will be sampled
 ##' @param fixed a matrix of covariates
-##' @param stabIndex output from \link{\code{setupStabilityIndex}}
+##' @param stabIndex output from \code{\link{setupStabilityIndex}}
 ##' @param step indices of components to run from \code{stabIndex}. Defaults to all.
 ##' @param method what method, eg, \code{fitHurdle} or \code{autoGLM}
 ##' @param stabilityCheckpointDir path to save output from each stability iteration
@@ -327,11 +328,11 @@ stability <- function(obs, fixed, stabIndex, step=seq_along(stabIndex), method, 
 ##' We call an edge \emph{empirically transient} when the stability coefficient is below tau.
 ##' Then for a sparsity theta < .1 and stability coefficient tau > .7, the ratio of empirical transient edges to population edges is less than 1%, and in fact typically more like .1%.
 ##' (Table 2 of Shah and Samworth)
-##' @param stabout output of \link{\code{stability}}
+##' @param stabout output of \code{\link{stability}}
 ##' @param theta sparsity of the solution in terms of the number of parameters. default .1.
-##' @param stabilityCheckpointDir 
-##' @return 
-##' @author Andrew McDavid
+##' @param stabilityCheckpointDir path to a directory to write checkpoint files
+##' @return A list with components.  You probably want component 3, giving the stability coefficients for each edge.
+### \code{stabCoefEdge}, a matrix of flattened, "vectorized" adjacency matrices; \code{estEdges} giving the number of edges estimated for each column \code{stabCoefEdge}, 
 collectStability <- function(stabout, theta=.1, stabilityCheckpointDir=NULL){
     if(!is.null(stabilityCheckpointDir)){
         chkfiles <- list.files(stabilityCheckpointDir, pattern='chk_s.*.rds', full.names=TRUE)

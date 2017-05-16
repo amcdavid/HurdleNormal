@@ -7,7 +7,7 @@
 \title{Fit the hurdle model coordinate-by-coordinate on a sample}
 \usage{
 autoGLM(samp, fixed = NULL, parallel = FALSE, keepNodePaths = FALSE,
-  checkpointDir, nlambda = 200, lambda.min.ratio = 0.1,
+  checkpointDir = "ignored", nlambda = 200, lambda.min.ratio = 0.1,
   family = "binomial")
 
 fitHurdle(samp, fixed = NULL, parallel = TRUE, keepNodePaths = FALSE,
@@ -22,9 +22,9 @@ fitHurdle(samp, fixed = NULL, parallel = TRUE, keepNodePaths = FALSE,
 
 \item{keepNodePaths}{return node-wise output (solution paths and diagnostics for each node) as attribute `nodePaths`}
 
-\item{checkpointDir}{(optional) directory to save the fit of each gene, useful for large problems.  If it exists, then completed genes will be automatically loaded.}
+\item{checkpointDir}{(optional) directory to save the fit of each node, useful for large problems.  If it exists, then completed nodes will be automatically loaded.}
 
-\item{nlambda}{number of lambda values on grid (default 200)}
+\item{nlambda}{number of lambda values on grid (default 200).}
 
 \item{lambda.min.ratio}{minimum lambda ratio (as a function of lambda0, where the first predictor enters; default .1)}
 
@@ -47,3 +47,6 @@ Fit the hurdle model coordinate-by-coordinate on a sample
 \item \code{autoGLM}: Fit an auto-model (Ising or Gaussian) to \code{samp} using glmnet.  checkpointDir is currently ignored.
 }}
 
+\seealso{
+neighborhoodToArray, autoGLM, interpolateEdges
+}

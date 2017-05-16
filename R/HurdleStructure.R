@@ -4,7 +4,7 @@
 ##' @param sample optional sample from the model
 ##' @param gibbs If \code{TRUE}, then sample from the provided model.  Else may contain a sample from the model
 ##' @param estimate optional estimated coefficients (replaces provided \code{G}, \code{H}, \code{K} if provided).
-##' @param gibbs_args list of arguments passed to \link{\code{getGibbs}}
+##' @param gibbs_args list of arguments passed to \code{\link{getGibbs}}
 ##' @return \code{list} with the above components
 ##' @author Andrew McDavid
 HurdleStructure <- function(G=NULL, H=NULL, K=NULL, sample=NULL, gibbs=TRUE, estimate=NULL, gibbs_args=list(kcell=1, mvnorm=FALSE)){
