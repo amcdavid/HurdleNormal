@@ -48,6 +48,9 @@ sparseCbind <- function(x, sparse=TRUE){
 ##' @param nobs number of observations the model was fit; used to calculate BIC
 ##' @param self_edges should self edges (loops) be returned in the adjacency matrix; this allows inference of intercept quantities.
 ##' @return list of (sparse) adjacency matrices, the number of non-zero elements (edges, before enforcing symmetry) for each matrix, the lambda for each matrix, the non-penalized, refitted pseudo log-likelihood, the number of parameters per edge, and the BIC
+##' @seealso fitHurdle, autoGLM, interpolateEdges
+##' @title neighborhoodToArray
+##' @aliases print.HurdleNormalFit
 ##' @export
 neighborhoodToArray <- function(pathList, nknots, vnames=NULL, summaryFun=summarySignedL1, nobs, self_edges=FALSE){
     lambdaRange <- t(sapply(pathList, function(x){
@@ -100,9 +103,21 @@ neighborhoodToArray <- function(pathList, nknots, vnames=NULL, summaryFun=summar
     }
     out = list(adjMat=adjMat, trueEdges=unlist(nnz), lambda=lpath, pseudo_loglik_np=colSums(loglikmatrix), n_param_per_edge=unlist(n_param_per_edge))
     out$BIC = -2*out$pseudo_loglik_np + log(nobs)*out$trueEdges*out$n_param_per_edge
+    BIC_etc <- data.table(trueEdges=out$trueEdges, lambda=out$lambda, pseudo_loglik_np=out$pseudo_loglik_np, BIC=out$BIC, adjMat_idx=seq_along(adjMat))
+    out$BIC_etc <- BIC_etc
+    class(out) <- 'HurdleNormalFit'
     out
 }
 
+
+##' @export
+print.HurdleNormalFit <- function(x, ...){
+    cat(sprintf('A fitted network on %d nodes containing a solution path over %d graphs.
+Whose edge counts range from %d-%d edges.
+Components are %s.
+',
+nrow(x$adjMat[[1]]), length(x$adjMat), min(x$trueEdges), max(x$trueEdges), paste(names(x), collapse=', ')))
+}
 
 ##' Return a function interpolating over a grid 
 ##'
@@ -212,7 +227,7 @@ onlyTri <- function(mat, diag=FALSE, upper=TRUE)if(upper) mat[upper.tri(mat)] el
 ##' @param nknot number knots over which to interpolate
 ##' @export
 ##' @return a list of `edgeInterp`: contains a list of length `nknot` of sparse adjacency matrices, `estEdges` the desired number of edges to be interpolated, `trueEdges` the actual number of edges, `BIC`, the interpolated BIC.
-interpolateEdges <- function(array, lambda, knot, nknot=100){
+interpolateEdges <- function(array, knot, nknot=100){
     lambda <- array$lambda
     Mpath <- array$adjMat
     lo <- order(lambda)
