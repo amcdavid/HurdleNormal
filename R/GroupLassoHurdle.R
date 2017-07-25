@@ -219,7 +219,7 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
             tol <- gnorm
         } else{
             subtheta <- theta[blocklist[[b]]]
-            tnorm <- sqrt(crossprod(subtheta, hess[[b]]) %*% subtheta)
+            tnorm <- as.vector(sqrt(crossprod(subtheta, hess[[b]]) %*% subtheta))
             if(tnorm > 0){
                 pgrad <- sgrad + lambda * as.vector(hess[[b]] %*% subtheta)/tnorm
                 gnorm <- sqrt(sum(pgrad^2))
