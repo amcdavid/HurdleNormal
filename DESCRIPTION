@@ -1,6 +1,6 @@
 Package: HurdleNormal
 Title: 'Estimation and sampling for multi-dimensional Hurdle models on a Normal density with applications to single-cell co-expression'
-Version: 0.98.2
+Version: 0.98.3
 Authors@R: person("Andrew", "McDavid", , "Andrew_McDavid@urmc.rochester.edu", role = c("aut", "cre"))
 Description: A Hurdle model is a modification of a distribution at zero. This
     package provides routines to estimate and sample from multivariate Hurdle models
