@@ -8,7 +8,7 @@ double expit(double x){
   return exp(x)/(1+exp(x));
 }
 
-// [[Rcpp::export(".rCondHurdle")]]
+// [[Rcpp::export]]
 double cpp_rCondHurdle(const NumericVector& x, int j, const NumericMatrix& G,  const NumericMatrix& H,  const NumericMatrix& K, double tol){
   int p=G.nrow();
   NumericVector xI = ifelse(abs(x)>tol, 1.0, 0.0);
@@ -38,7 +38,7 @@ double cpp_rCondHurdle(const NumericVector& x, int j, const NumericMatrix& G,  c
 }
 
 //' @export
-// [[Rcpp::export(".rGibbsHurdle")]]
+// [[Rcpp::export]]
 NumericMatrix cpp_rGibbsHurdle(const NumericMatrix& G, const NumericMatrix& H, const NumericMatrix& K, int Nt, double tol){
   int p = G.nrow(), j=0;
   //although samp is a vector, really think of it as a p * Nt matrix

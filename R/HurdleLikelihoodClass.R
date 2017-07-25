@@ -92,5 +92,5 @@ HurdleLikelihood <- function(y, x, grp, theta, lambda=0, tol=1e-4){
     if(!is.numeric(lambda)) stop("`lambda` must be numeric")
     if(any(floor(grp)!=grp)) stop("`grp` must be integer")
     if(!is.numeric(tol)) stop("`tol` must be numeric")
-    new('HurdleLikelihood', pointer=.Call(HurdleLikelihood_method("new"), y, x, grp, theta, lambda, tol), p=as.integer(ncol(x)))
+    new('HurdleLikelihood', pointer=.Call(HurdleLikelihood_method("new"), y, x, grp, theta, lambda, tol, PACKAGE = 'HurdleNormal'), p=as.integer(ncol(x)))
 }

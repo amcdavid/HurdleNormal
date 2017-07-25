@@ -151,7 +151,7 @@ dHurdle210 <- function(x, G, H, K, tol=5e-2){
 rCondHurdle210 <- function(x, j, G, H, K, tol=5e-4){
     stopifnot(length(j) == 1 && ncol(x)  == ncol(G)-1)
     .checkArgs(G=G, H=H, K=K)
-    if(is.matrix(x)) plyr::aaply(x, 1, .rCondHurdle, j=j-1, G=G, H=H, K=K, tol=tol) else .rCondHurdle(x, j-1, G, H, K, tol)
+    if(is.matrix(x)) plyr::aaply(x, 1, cpp_rCondHurdle, j=j-1, G=G, H=H, K=K, tol=tol) else cpp_rCondHurdle(x, j-1, G, H, K, tol)
 }
 
 
@@ -209,7 +209,7 @@ rGibbsHurdle <- function(G, H, K, Nt, burnin=500, thin=.1, tol=5e-4, Nkeep=500){
         Nt <- (Nkeep)*round(1/thin) + burnin
     }
     if(burnin>Nt) stop("More burnin samples than total samples!")
-    tmat <- .rGibbsHurdle(G, H, K, Nt, tol)
+    tmat <- cpp_rGibbsHurdle(G, H, K, Nt, tol)
     mat <- t(tmat)[-seq_len(burnin),]
     keep <- seq(from=1, to=nrow(mat), by=round(1/thin))
     mat[keep,]
