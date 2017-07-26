@@ -86,14 +86,13 @@ But single cell gene expression is zero-inflated, and not plausibly described by
 ```{r}
 library(stringr)
 data(shalek2014)
-allgenes <- rownames(shalek2014_list$exprs)
 set.seed(1234)
-genes <- c('MGL2', 'MX1', str_subset(allgenes, 'H2-'), sample(allgenes, 30))
 
-logExpression1h = t(shalek2014_list$exprs)[,genes]
+logExpression1h = t(shalek2014_list$exprs)
 ##ggpairs doesn't like non-syntactic colnames
-colnames(logExpression1h) <- make.names(colnames(logExpression1h)) 
-## logExpression1h = t(shalek2014_list$exprs) #Uncomment to run on full dataset
+colnames(logExpression1h) <- make.names(colnames(logExpression1h))
+allgenes <- colnames(logExpression1h)
+genes <- c('MGL2', 'MX1', str_subset(allgenes, '^H2[.]'), sample(allgenes, 30))
 ggpairs(as.data.frame(logExpression1h[,c('MGL2', 'MX1', 'H2.AA')]),upper=list(continuous=ggally_hurdle), lower=list(continuous=ggally_hmosaic))
 ```
 
@@ -117,11 +116,12 @@ The edges are discovered by fitting a vector regression model gene by gene.
 Because it is a regression, it's easy to add covariates.
 In this case, we adjust for the cellular detection rate.
 ```{r, results='hide', message=FALSE}
-#options(mc.cores=4) #or however many your system has
-covariates = cbind(1, scale(shalek2014_list$cdata$ngeneson))
-#This argument only fits the first 10 genes so that the vignette compiles in a reasonable fashion.
-#Leave it unset otherwise (or you can use it to parallelize across clusters) 
-hurdle_fit = fitHurdle(exp1h_trans,  fixed=covariates, parallel=FALSE, control=list(debug=0))
+## options(mc.cores=4) #or however many your system has
+covariates = cbind(1, scale(shalek2014_list$cdata$
+                                        ngeneson))
+## Only fits a subset of genes so that the vignette compiles in a reasonable fashion
+## See also "subset" to enable parallization across a cluster
+hurdle_fit = fitHurdle(exp1h_trans[,genes],  fixed=covariates, parallel=FALSE, control=list(debug=0))
 ```
 
 ```{r}
@@ -167,4 +167,4 @@ available with `?autoGLM.`
 * **Differential coexpression**. Most of the infrastructure is in place to use these procedures to look for
   differential coexpression graphs, but code defining the parameter
   blocks is not yet implemented.  See `?makeModel` and `?Blocks` for
-  the functions that would need to be overrided and used.
+  the functions that would need to be over-ridden and used.

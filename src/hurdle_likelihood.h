@@ -39,9 +39,9 @@ class HurdleLikelihood {
   //public:
   HurdleLikelihood (const arma::vec& y_, const arma::mat& xd_, const arma::ivec& grp_, const arma::vec& th, const arma::vec& lambda_, double tol);
   double LL(const arma::vec& th, bool penalize);
-  double LL(bool penalize);
-  arma::vec grad(const arma::vec& th, bool penalize);
-  arma::vec grad(bool penalize);
+  double LLpen(bool penalize);
+  arma::vec gradAll(const arma::vec& th, bool penalize);
+  arma::vec gradFixed(bool penalize);
   //arma::mat hessian(const arma::vec& th, int grp);
   void setLambda(const arma::vec& lambda_);
   static arma::uvec::fixed<7> parmap(int k_);

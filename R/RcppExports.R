@@ -2,11 +2,11 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 cpp_rCondHurdle <- function(x, j, G, H, K, tol) {
-    .Call('HurdleNormal_cpp_rCondHurdle', PACKAGE = 'HurdleNormal', x, j, G, H, K, tol)
+    .Call('_HurdleNormal_cpp_rCondHurdle', PACKAGE = 'HurdleNormal', x, j, G, H, K, tol)
 }
 
 #' @export
 cpp_rGibbsHurdle <- function(G, H, K, Nt, tol) {
-    .Call('HurdleNormal_cpp_rGibbsHurdle', PACKAGE = 'HurdleNormal', G, H, K, Nt, tol)
+    .Call('_HurdleNormal_cpp_rGibbsHurdle', PACKAGE = 'HurdleNormal', G, H, K, Nt, tol)
 }
 

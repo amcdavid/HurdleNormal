@@ -51,14 +51,14 @@ void HurdleLikelihood::populatePar(const vec& th){
 // Replace all coordinates
 double HurdleLikelihood::LL(const vec& th, bool penalize){
   populatePar(th);
-  return(LL(penalize));
+  return(LLpen(penalize));
 }
 
 
 
 //th parameters, grp groups
 //all others held fixed
-double HurdleLikelihood::LL(bool penalize){
+double HurdleLikelihood::LLpen(bool penalize){
   double pen = 0;
   if(kbb<=0) return(99999999.0);
   double nloglik = sum(yI % gpart + y % hpart - cumulant) -.5*Sy2*kbb;
@@ -81,13 +81,13 @@ double HurdleLikelihood::LL(bool penalize){
    The rest collapses into a sum, so we use the linear sufficient stats,
    which are added to `Sdc` after we sum over `dc`.
  */
-vec HurdleLikelihood::grad(const vec& th, bool penalize){
+vec HurdleLikelihood::gradAll(const vec& th, bool penalize){
   populatePar(th);
-  vec g = grad(penalize);
+  vec g = gradFixed(penalize);
   return(g);
 }
 
-vec HurdleLikelihood::grad(bool penalize){
+vec HurdleLikelihood::gradFixed(bool penalize){
   arma::vec gvec(2*k+1, fill::zeros);
 
   gvec.subvec(0, k-1) = SyIxd- trans(trans(cumulant2) * xd);
@@ -132,114 +132,17 @@ arma::uvec::fixed<7> HurdleLikelihood::parmap(int k_) {
  */
 using namespace Rcpp;
 
- /// create an external pointer to a HurdleLikelihood
-RcppExport SEXP HurdleLikelihood__new(SEXP y, SEXP x, SEXP grp, SEXP th_, SEXP lambda, SEXP tol) {
-// convert inputs to appropriate C++ types
-  DPRINT("Starting wrapper\n");
-  arma::vec y_ = as<arma::vec>(y);
-  arma::mat x_ = as<arma::mat>(x);
-  arma::vec th = as<arma::vec>(th_);
-  arma::ivec grp_ = as<arma::ivec>(grp);
-  arma::vec lambda_ = as<arma::vec>(lambda);
-  double tol_ = as<double>(tol);
-  DPRINT("Finished wrapper\n");
-  Rcpp::XPtr<HurdleLikelihood> ptr( new HurdleLikelihood( y_, x_, grp_, th, lambda_, tol_), true );
+RCPP_MODULE(HurdleLikelihoodMod){
+  class_<HurdleLikelihood>("HurdleLikelihoodMod")
 
-// return the external pointer to the R side
-return ptr;
-
-}
-
-
-/*
-/// invoke the loglikelihood method
-RcppExport SEXP HurdleLikelihood__LL(SEXP xp, SEXP thR_, SEXP grpR_, SEXP penalize_) {
-  // grab the object as a XPtr (smart pointer)
-  Rcpp::XPtr<HurdleLikelihood> ptr(xp);
-  // convert the parameter to int
-  arma::vec th = as<arma::vec>(thR_);
-  int grp = as<int>(grpR_);
-  bool penalize = as<bool>(penalize_);
-  double res = ptr->LL( th , grp, penalize);
-  // return the result to R
-  return wrap(res);
-}
-*/
-
-// invoke the loglikelihood (don't curry)
-RcppExport SEXP HurdleLikelihood__LLall(SEXP xp, SEXP th_, SEXP penalize_) {
-  Rcpp::XPtr<HurdleLikelihood> ptr(xp);
-  arma::vec th = as<arma::vec>(th_);
-  bool penalize = as<bool>(penalize_);
-  double res = ptr->LL(th, penalize);
-  return wrap(res);
-}
-
-
-/// invoke the gradient method (piecewise)
-/*
-RcppExport SEXP HurdleLikelihood__grad(SEXP xp, SEXP th_, SEXP grp_, SEXP penalize_) {
-  // grab the object as a XPtr (smart pointer)
-  Rcpp::XPtr<HurdleLikelihood> ptr(xp);
-  arma::vec th = as<arma::vec>(th_);
-  int grp = as<int>(grp_);
-  bool penalize = as<bool>(penalize_);
-  arma::vec res = ptr->grad(th, grp, penalize, true);
-  return wrap(res);
-}
-*/
-
-//grad (all coordinates)
-RcppExport SEXP HurdleLikelihood__gradAll(SEXP xp, SEXP th_, SEXP penalize_) {
-  Rcpp::XPtr<HurdleLikelihood> ptr(xp);
-  arma::vec th = as<arma::vec>(th_);
-  bool penalize = as<bool>(penalize_);
-  arma::vec res = ptr->grad(th, penalize);
-  return wrap(res);
-}
-
-RcppExport SEXP HurdleLikelihood__gradAllFixed(SEXP xp, SEXP penalize_) {
-  Rcpp::XPtr<HurdleLikelihood> ptr(xp);
-  bool penalize = as<bool>(penalize_);
-  arma::vec res = ptr->grad(penalize);
-  return wrap(res);
-}
-
-RcppExport SEXP HurdleLikelihood__setLambda(SEXP xp, SEXP lambda_){
-  // grab the object as a XPtr (smart pointer)
-  Rcpp::XPtr<HurdleLikelihood> ptr(xp);
-  arma::vec lambda = as<arma::vec>(lambda_);
-  ptr->setLambda(lambda);
-  return ptr;
-}
-
-//debugging code follows
-RcppExport SEXP HurdleLikelihood__gpart(SEXP xp) {
-  Rcpp::XPtr<HurdleLikelihood> ptr(xp);
-  return wrap(ptr->gpart);
-}
-
-RcppExport SEXP HurdleLikelihood__hpart(SEXP xp) {
-  Rcpp::XPtr<HurdleLikelihood> ptr(xp);
-  return wrap(ptr->hpart);
-}
-
-RcppExport SEXP HurdleLikelihood__cumulant(SEXP xp) {
-  Rcpp::XPtr<HurdleLikelihood> ptr(xp);
-  return wrap(ptr->cumulant);
-}
-
-RcppExport SEXP HurdleLikelihood__cumulant2(SEXP xp) {
-  Rcpp::XPtr<HurdleLikelihood> ptr(xp);
-  return wrap(ptr->cumulant2);
-}
-
-RcppExport SEXP HurdleLikelihood__gplusc(SEXP xp) {
-  Rcpp::XPtr<HurdleLikelihood> ptr(xp);
-  return wrap(ptr->gplusc);
-}
-
-RcppExport SEXP HurdleLikelihood__lambda(SEXP xp) {
-  Rcpp::XPtr<HurdleLikelihood> ptr(xp);
-  return wrap(ptr->lambda);
+    .constructor<arma::vec, arma::mat, arma::ivec, arma::vec, arma::vec, double>()
+    .method("LLall", &HurdleLikelihood::LL, "Eval log-likelihood at a new parameter theta.")
+    .method("gradAll", &HurdleLikelihood::gradAll, "Eval grad at new theta.")
+    .method("gradFixed", &HurdleLikelihood::gradFixed, "Eval grad at (implicit) current theta.")
+    .field("lambda", &HurdleLikelihood::lambda, "mutate penalty parameter/vector.")
+    .field_readonly("cumulant2", &HurdleLikelihood::cumulant2, "Access squared cumulant.")
+    .field_readonly("gpart", &HurdleLikelihood::gpart, "G crossproduct.")
+    .field_readonly("hpart", &HurdleLikelihood::hpart, "H crossproduct.")
+    .field_readonly("gplusc", &HurdleLikelihood::gplusc, "G + C.")
+    ;
 }

@@ -2,6 +2,7 @@
 % Please edit documentation in R/HurdleDistributions.R
 \name{rGibbsHurdle}
 \alias{rGibbsHurdle}
+\alias{cpp_rGibbsHurdle}
 \title{Sample from a multivariate hurdle model}
 \usage{
 rGibbsHurdle(G, H, K, Nt, burnin = 500, thin = 0.1, tol = 5e-04,

@@ -83,7 +83,7 @@ projectEllipse <- function(v, lambda, d, u, control){
 ##' @param theta (optional) initial guess for parameter
 ##' @return matrix of parameters, one row per lambda
 ##' @useDynLib HurdleNormal
-##' @importFrom Rcpp sourceCpp
+##' @import Rcpp
 ##' @export
 cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_character_, nlambda=50, lambda.min.ratio=if(length(y.zif)<ncol(this.model)) .005 else .05, lambda, penaltyFactor='full', control=list(tol=5e-3, maxrounds=300, debug=1), theta){
     defaultControl <- list(tol=5e-3, maxrounds=300, debug=1, stepcontract=.5, stepsize=1, stepexpand=.1, FISTA=FALSE, newton0=FALSE, safeRule=2, returnHessian=FALSE, refit=TRUE)
@@ -180,6 +180,11 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
         eig <- eigen(penMat[[b]])
         eigval[[b]] <- eig$values
         eigvec[[b]] <- eig$vectors
+        if(any(eig$values)<0){
+            warning('Negative eigenvalues in block ', b, " :'(")
+            eig$values <- pmax(eig$values, 0)
+            browser()
+            }
         sqrtPen[[b]] <- eig$vectors %*% sqrt(diag(eig$values)) %*% t(eig$vectors)
     }
 
@@ -187,13 +192,11 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
 
     ## Returns proximal subtheta
     proxfun <- function(b, subtheta, gamma, lambda){
-        #subtheta <- theta[blocklist[[b]]]
         if(Blocks$lambdablock[b]<=0 || lambda <=0){
             return(subtheta)
         } else {
             u <- eigvec[[b]]
             d <- eigval[[b]]
-            ## pm <- penMat[[b]]
             sqrtPen <- sqrtPen[[b]]
             v <- (t(u) %*% sqrtPen %*% subtheta)
             tnorm <- sqrt(sum(v^2))
@@ -233,8 +236,7 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
     }
 
     ## estimate lambda0 given penalty
-    gr <- hl$gradAll(theta)
-    l0block <- sapply(seq_along(blocklist), kktfun, theta=theta, nonpengrad=hl$gradAll(theta), lambda=0, gnormOnly=TRUE)
+    l0block <- sapply(seq_along(blocklist), kktfun, theta=theta, nonpengrad=hl$gradAll(theta, penalize = TRUE), lambda=0, gnormOnly=TRUE)
     gradblock <- data.table(g0=l0block, block=seq_along(l0block), active=FALSE)
     gradblock[block==1, active:=TRUE]
     l0 <- max(l0block)
@@ -259,11 +261,11 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
     ## loop over lambda
     refitted <- FALSE
     for(l in seq_along(lambda)){
-        hl$setLambda(lambda[l])
+        hl$lambda <- lambda[l]
         if(l>1){
             gradblock <- safeRule(gradblock, lambda[l], lambda[l-1], control$safeRule)
         }
-        sp <- solvePenProximal(theta, lambda[l], control, blocklist, LLall, gradAll, proxfun, kktfun, hess, pre0, gamma, gradblock)
+        sp <- solvePenProximal(theta, lambda[l], control, blocklist, hl, proxfun, kktfun, hess, pre0, gamma, gradblock)
         gamma <- as.numeric(attr(sp, 'flag')['gamma'])
         theta <- out[l,] <- as.numeric(sp)
         kktout[l,] <- attr(sp, 'kkt')[2,]
@@ -318,10 +320,10 @@ refitModel <- function(theta_, this.model, y.zif, activetheta, blocks, fuzz=0, c
 blockHessian <- function(theta, sg, Blocks, X, onlyActive=TRUE, control, fuzz=.1, hl, exact=FALSE){
     hess <- vector('list', length(Blocks))
     hl$LLall(theta, penalize=FALSE)
-    gpart <- hl$gpart()
-    gplusc <- hl$gplusc()
-    hpart <- as.vector(hl$hpart())
-    w1 <- as.vector(hl$cumulant2())
+    gpart <- hl$gpart
+    gplusc <- hl$gplusc
+    hpart <- as.vector(hl$hpart)
+    w1 <- as.vector(hl$cumulant2)
     w2 <- as.vector(exp(-gplusc)*w1^2)
     kbb <- theta[length(theta)]
     for(b in seq_along(Blocks$lambdablock)){
@@ -348,7 +350,7 @@ safeRule <- function(gradblock, l1, l0, rule){
 }
 
 ## Solve the penalized function using proximal gradient descent
-solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, proxfun, kktfun, hess, pre0, gamma, gradblock){
+solvePenProximal <- function(theta, lambda, control, blocklist, hl, proxfun, kktfun, hess, pre0, gamma, gradblock){
     feval <- geval <- 0
     ## total number of rounds
     mround <- round <- 0
@@ -364,8 +366,8 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
     thetaPrime0 <- thetaPrime1 <- theta
     ## line search parameters
     if(gamma<=0)     gamma <- control$stepsize
-    thisll <- LLall(theta, penalize=FALSE)
-    gr <- gradAll(penalize=FALSE)
+    thisll <- hl$LLall(theta, penalize = FALSE)
+    gr <- hl$gradFixed(penalize = FALSE)
 
     kkt <- vapply(seq_along(blocklist), kktfun, c(NA_real_, 1), theta=thetaPrime1, nonpengrad=gr, lambda=lambda)
     if(control$debug>2){
@@ -389,7 +391,7 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
             }
         }
         feval <- feval+1
-        newll <- LLall(theta, penalize=FALSE)
+        newll <- hl$LLall(theta, penalize=FALSE)
         boydCondition1 <- thisll +crossprod(gr, theta-thetaPrime1)+ sum((thetaPrime1-theta)^2) /(2* gamma)
 
         ## Has the majorization minimum decreased the unpenalized objective?
@@ -417,7 +419,7 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
                 thetaTmp <- theta + omega*(theta-thetaPrime0)
                 thetaPrime0 <- thetaPrime1
                 thetaPrime1 <- thetaTmp
-                newll <- LLall(thetaPrime1, penalize=F)
+                newll <- hl$LLall(thetaPrime1, penalize=F)
             } else{
                 thetaPrime0 <- thetaPrime1
                 thetaPrime1 <- theta
@@ -432,7 +434,7 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
 
             ##update gradient and test kkt
             ## (no need if we haven't moved thetaPrime1)
-            gr <- gradAll(penalize=FALSE)
+            gr <- hl$gradFixed(penalize = FALSE)
             geval <- geval+length(blocklist)
             kktA <- vapply(bActive, kktfun, c(NA_real_, 1), theta=thetaPrime1, nonpengrad=gr, lambda=lambda)
             if(all(kktA[2,]<control$tol)){
@@ -450,8 +452,8 @@ solvePenProximal <- function(theta, lambda, control, blocklist, LLall, gradAll, 
                     st <- theta[blocklist[[b]]]
                     lambda*sqrt(crossprod(st, hess[[b]]) %*% st)
                 })
-                message(noquote(paste0('penll=', round(LLall(thetaPrime1, penalize=FALSE) + sum(pen), 5), ' theta= ', paste(round(thetaPrime1, 2), collapse=','), 'gamma= ', smessagef('%2.2e', gamma))))
-                debugval$thisll[round] <- LLall(thetaPrime1, FALSE)+sum(pen)
+                message(noquote(paste0('penll=', round(hl$LLall(thetaPrime1, penalize=FALSE) + sum(pen), 5), ' theta= ', paste(round(thetaPrime1, 2), collapse=','), 'gamma= ', sprintf('%2.2e', gamma))))
+                debugval$thisll[round] <- hl$LLall(thetaPrime1, FALSE)+sum(pen)
            }
             if(control$debug>2){
                 debugval$kkt[round,] <- kkt
