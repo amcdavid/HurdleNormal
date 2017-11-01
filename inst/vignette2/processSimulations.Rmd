@@ -8,6 +8,7 @@ library(data.table)
 library(GGally)
 library(HurdleNormal)
 library(cowplot)
+library(stringr)
 theme_set(theme_bw())# + theme(legend.position=c(.8, .2)))
 
 label_singleline <- function(x) label_value(x, multi_line = FALSE)
@@ -17,12 +18,27 @@ fittedmodels <- lapply(sims_files, readRDS)
 
 ```
 
-```{r plotSim, dev=c('png', 'pdf')}
-ggpairs(as.data.table(modelList[[19]]$gibbs[,1:3]), lower=list(continuous=ggally_hurdle), upper=list(continuous=HurdleNormal:::ggally_hmosaic))
-ggpairs(as.data.table(modelList[[20]]$gibbs[,1:3]), lower=list(continuous=ggally_hurdle), upper=list(continuous=HurdleNormal:::ggally_hmosaic))
-ggpairs(as.data.table(modelList[[34]]$gibbs[,1:3]), lower=list(continuous=ggally_hurdle), upper=list(continuous=HurdleNormal:::ggally_hmosaic))
+## Example of data distributions
+```{r}
+plot_data_dist = function(i){
+    ggpairs(as.data.table(modelList[[i]]$gibbs[,1:3]), lower=list(continuous=ggally_hurdle), upper=list(continuous=HurdleNormal:::ggally_hmosaic)) +ggtitle(paste(modelArgs[i,], collapse = '/'))
+}
 ```
-Here are examples of models 1,2 and 4.
+
+```{r plotSim}
+plot_data_dist(19)
+```
+Model 1
+
+```{r}
+plot_data_dist(20)
+```
+Model 2
+
+```{r}
+plot_data_dist(34)
+```
+Model 4
 
 
 ```{r processSimulations, dev=c('png', 'pdf')}
@@ -43,7 +59,7 @@ for(i in seq_along(fittedmodels)){
 allmodels <- rbindlist(fittedmodels, idcol='rep')
 allmodels[L1=='Aracne' & oracle=='BIC', FDR:=NA]
 
-oracles <- allmodels[!is.na(oracle),.(sensitivity=mean(sensitivity), fdr=mean(FDR), sd_sens = sd(sensitivity), sd_fdr = sd(FDR)),keyby=list(L1, oracle, i)][modelArgs,,on='i']
+oracles <- allmodels[!is.na(oracle),.(sensitivity=mean(sensitivity), fdr=mean(FDR), sem_sens = sd(sensitivity)/sqrt(.N), sem_fdr = sd(FDR)/sqrt(.N)),keyby=list(L1, oracle, i)][modelArgs,,on='i']
 oracles[, Nfactor:=as.numeric(factor(N))]
 oracles[is.na(contam), contam:='none']
 oracles[oracle=='BIC' & L1=='Aracne', ':='(FDR=NA, sensitivity=NA)]
@@ -51,8 +67,12 @@ setkey(oracles, type, L1, Nfactor)
 ```
 Load processed simulations.
 
-
-
+## Monte Carlo error
+```{r}
+oracles[,list(err_pct_sens = median(sem_sens/sensitivity, na.rm = TRUE)*100, err_pct_fdr = median(sem_fdr/fdr, na.rm = TRUE)*100), by = list(L1)]
+```
+Median monte carlo error 
+## Consistency by BIC
 ```{r bic_consistency}
 bic_plt <- ggplot(oracles[oracle=='BIC' & aspect1=='consistency'], aes(x=fdr, y=sensitivity, label=Nfactor, color=L1))+ geom_point(size=.1) + geom_text(vjust=0, hjust=0, size=3) + geom_path(aes(group=L1)) + facet_wrap(~type + contam, labeller=label_singleline) + ggtitle("Consistency and BIC tuning") + ylab('Sensitivity') + xlab('FDR')  + scale_color_discrete('Method')+ theme(legend.position=c(.8, .2))
 ```
@@ -128,4 +148,10 @@ dim_scale_plt %+% oracles[oracle=='FDR' & N==100 & P!=24 & type  != 'ecoli'] + s
 
 ```{r draw_subset_roclike, dev=c('png', 'pdf'), fig.width=5, fig.height=5}
 roclike_plt %+% roclike[contam=='none'] + geom_point(data=bic[contam=='none'], pch=9) + theme(legend.position='bottom')
+```
+
+## Anova on simulation
+```{r}
+
+
 ```

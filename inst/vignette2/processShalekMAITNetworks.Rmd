@@ -115,6 +115,7 @@ par(oma=c(0,0,0,0)+.1, mar=c(0,0,3, 0)+.1)
 plotgenesee(ealist2[[1]], godb, goTerm, network=alex_fits_fl[[names(ealist2)[1]]], data.table(GOID=terms, category=names(terms)), additionalGenes=c('MX1', 'CCL17', 'TAX1BP3', 'CCL3', 'MGL2', 'H2-AB1', 'H2-EB1', 'H2-AA', 'FABP5'))  
 plotgenesee(ealist2[[2]], godb, goTerm, network=alex_fits_fl[[names(ealist2)[2]]], data.table(GOID=terms, category=names(terms)), additionalGenes=c('MX1', 'CCL17', 'TAX1BP3', 'CCL3', 'MGL2', 'H2-AB1', 'H2-EB1', 'H2-AA', 'FABP5'))  
 plotgenesee(ealist2[[3]], godb, goTerm, network=alex_fits_fl[[names(ealist2)[3]]], data.table(GOID=terms, category=names(terms)), additionalGenes=c('MX1', 'CCL17', 'TAX1BP3', 'CCL3', 'MGL2', 'H2-AB1', 'H2-EB1', 'H2-AA', 'FABP5'))
+plotgenesee(ealist2[[4]], godb, goTerm, network=alex_fits_fl[[names(ealist2)[4]]], data.table(GOID=terms, category=names(terms)), additionalGenes=c('MX1', 'CCL17', 'TAX1BP3', 'CCL3', 'MGL2', 'H2-AB1', 'H2-EB1', 'H2-AA', 'FABP5'))
 
 
 ```
@@ -215,7 +216,7 @@ lapply(unlist(manystab[subs], recursive=F), function(x) c(sum(x>.01), sum(x>.5),
 
 ## BIC Comparison
 
-```{r BICplot}
+```{r BICplot_thf}
 BIC_all <-  rbindlist(lapply(seq_along(outFlat), function(i){
     x <- mf2[[i]]
     data.frame(edges=x$trueEdges, BIC=x$BIC, method=names(outFlat)[[i]])
