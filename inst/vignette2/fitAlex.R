@@ -1,10 +1,10 @@
 ## sbatch -n1 -c16 -t1-01 R --vanilla -f fitAlex.R
 source('common.R')
-load(system.file('data-raw', 'shalek.RData', package='HurdleNormal'))
-sca_alex <- with(shalek, FromMatrix(exprs, cData, fData))
+load(system.file('data', 'shalek2014.RData', package='HurdleNormal'))
+sca_alex <- with(shalek2014_list, FromMatrix(exprs, cdata, fdata))
 lps_pam_freq <- freq(MAST::subset(sca_alex, Time =='2h' & Stim %in% c('LPS', 'PAM')))
-astim <- MAST::subset(sca_alex, Stim=='LPS' & Time=='2h')
-astim <- astim[lps_pam_freq>.3,]
+#astim <- MAST::subset(sca_alex, Stim=='LPS' & Time=='2h')
+astim <- sca_alex
 
 ## Fit networks
 alex_fits <- list()
@@ -17,40 +17,48 @@ alex_fits[['ngoLPS']] <- fitSomeModels(astim,  lambda.min.ratio=.4, nlambda=70, 
 gc()
 
 
-## Set up GSEA db
-## Calculate p values for marginal changes
-testbystim <- lapply(list('LPS'),function(s){
+
+if(FALSE){
+    ## Calculate p values for marginal changes
+    testbystim <- lapply(list('LPS'),function(s){
     zz <- zlm(~Time+ngeneson, data=sca_alex[rownames(astim),] , method='bayesglm')
     wt <- lrTest(zz, 'Time')
     data.table(ALIAS=sapply(rownames(astim), simpleCap), pval=wt[,'hurdle', 'Pr(>Chisq)'], sign=sign(coef(zz, 'D')), stim=s)
 })
+    testbystim2 <- rbindlist(testbystim, use.names=TRUE)
+    testbystim2[, fdr:=p.adjust(pval, 'bonferroni'),keyby=stim]
+    testbystim2[, cutfdr:=as.character(cut(fdr, c(0, 1e-3, 1e-2, 1e-1, 1), labels=c('***', '**', '*', "-"))),keyby=stim]
+    testbystim2[,GOID:=stringr::str_c(stim,':',  cutfdr, ':', sign.Time2h)]
+    
+    ## Set up GSEA db
+    k <-sapply(rownames(astim), simpleCap)
+    godb<- select(Mus.musculus, keys=k, columns='GOID', key='ALIAS')
+    setDT(godb)
+    godb$GOID <- as.character(godb$GOID)
+    setkey(godb, GOID, ALIAS)
+    godb<- unique(godb)
+    godb<- rbind(godb, cbind(testbystim2[, .(GOID, ALIAS)], EVIDENCE='MAR', ONTOLOGY='BP'), fill=TRUE)
+    godb[,N:=.N, key=GOID]
+    godb<- godb[N>2 &!is.na(GOID)]
+    setkey(godb, GOID)
+    sp <- godb[,.(.N), key=GOID]
+    goids <- unique(sp$GOID)
 
-testbystim2 <- rbindlist(testbystim, use.names=TRUE)
-testbystim2[, fdr:=p.adjust(pval, 'bonferroni'),keyby=stim]
-testbystim2[, cutfdr:=as.character(cut(fdr, c(0, 1e-3, 1e-2, 1e-1, 1), labels=c('***', '**', '*', "-"))),keyby=stim]
-testbystim2[,GOID:=stringr::str_c(stim,':',  cutfdr, ':', sign.Time2h)]
-
-## Count null populations for test
-k <-sapply(rownames(astim), simpleCap)
-godb<- select(Mus.musculus, keys=k, columns='GOID', key='ALIAS')
-setDT(godb)
-godb$GOID <- as.character(godb$GOID)
-setkey(godb, GOID, ALIAS)
-godb<- unique(godb)
-godb<- rbind(godb, cbind(testbystim2[, .(GOID, ALIAS)], EVIDENCE='MAR', ONTOLOGY='BP'), fill=TRUE)
-godb[,N:=.N, key=GOID]
-godb<- godb[N>2 &!is.na(GOID)]
-setkey(godb, GOID)
+    ## Save go terms as data.table
+    goTerm <- select(Mus.musculus, k=sp$GOID, columns=c('GOID', 'TERM', 'DEFINITION'), keytype='GOID')
+    setDT(goTerm)
+    goTerm$GOID <- as.character(goTerm$GOID)
+}
+## Use godb version GO.db_3.3.0
+load('godb.RData')
 sp <- godb[,.(.N), key=GOID]
 goids <- unique(sp$GOID)
+
+
+## Count null populations for test
 ## this overestimates the number of pairs by intersection(gene(i), genes(j)), but probably only matters for self-pairs
 nullgo <- CJ(GOID.i=goids, GOID.j=goids)[, Nij:=as.vector(outer(sp$N, sp$N))]
 nullgo[GOID.i==GOID.j, Nij:=Nij-sqrt(Nij)]
-
-## Save go terms as data.table
-goTerm <- select(Mus.musculus, k=sp$GOID, columns=c('GOID', 'TERM', 'DEFINITION'), keytype='GOID')
-setDT(goTerm)
-goTerm$GOID <- as.character(goTerm$GOID)
 
 ## Do permutation test
 graph <- alex_fits[[1]][[1]]$edgeInterp[[1]]
