@@ -297,6 +297,7 @@ edgeGoAnno <- function(ginterp, n, graph, goAlias, goTerm, background, annotate=
         goTerm <- goTerm[unique(gcbgSig$GOID.i)]
         gcbgSig <- merge(gcbgSig, goTerm[,.(GOID, TERM)], by.x='GOID.i', by.y='GOID', all.x=TRUE)
         gcbgSig <- merge(gcbgSig, goTerm[,.(GOID, TERM)], by.x='GOID.j', by.y='GOID', all.x=TRUE)
+        setnames(gcbgSig, c('TERM.x', 'TERM.y'), c('TERM.i', 'TERM.j'))
 
         ## get rid of duplicates (both pairs were concerned before)
         gcbgSig[, GOIDmin:=pmin(as.character(GOID.i), as.character(GOID.j))]
@@ -305,10 +306,10 @@ edgeGoAnno <- function(ginterp, n, graph, goAlias, goTerm, background, annotate=
         gcbgSig <- unique(gcbgSig)
         gcbgSig[,':='(GOIDmin=NULL, GOIDmax=NULL)]
 
-        gcbgSig[,':='(TERM.x=ifelse(is.na(TERM.x), GOID.i, TERM.x),
-             TERM.y=ifelse(is.na(TERM.y), GOID.j, TERM.y))]
-        gcbgSig[,':='(TERM.x=stringr::str_wrap(TERM.x, width=35),
-                      TERM.y=stringr::str_wrap(TERM.y, width=35))]
+        gcbgSig[,':='(TERM.i=ifelse(is.na(TERM.i), GOID.i, TERM.i),
+             TERM.j=ifelse(is.na(TERM.j), GOID.j, TERM.j))]
+        gcbgSig[,':='(TERM.i=stringr::str_wrap(TERM.i, width=35),
+                      TERM.j=stringr::str_wrap(TERM.j, width=35))]
         
         setkey(gcbgSig, phyperAdj)
         return(list(gcbgSig, goTerm, esetij[GOID.i%in% goTerm$GOID]))
@@ -323,6 +324,7 @@ plotgenesee <- function(x, godb, goTerm,network, goids, additionalGenes=NULL){
     E(geneseeG)$weights <- sqrt(-log10(x$phyper)-6)
     E(geneseeG)$group <- x$L1
     if(missing(goids)){
+        # take top 9 GO categories
         goids <- unique(x[Nij<7e4][1:9, c(GOID.i, GOID.j)])
     } else{
         goids <- unique(goids[GOID  %in% x$GOID.j |  GOID %in% x$GOID.i])
@@ -376,6 +378,7 @@ plotgenesee <- function(x, godb, goTerm,network, goids, additionalGenes=NULL){
     setkey(goTerm, GOID)
     geneseeGtable <- goTerm[names(V(geneseeG)),,nomatch=NA, mult='first']
     V(geneseeG)$label <- ifelse(is.na(geneseeGtable$TERM), '', stringr::str_wrap(geneseeGtable$TERM, 40))
+    geneseeG <- igraph::simplify(geneseeG, remove.multiple = TRUE, remove.loops = FALSE)
     plot(geneseeG, vertex.size=3, vertex.label.dist=.2, edge.width=E(geneseeG)$weights, layout=layout_with_kk, vertex.color=geneseeGtable$color, vertex.label.cex=1)
     legend('bottomright', fill=leg[,color], legend=leg[,category])
 
