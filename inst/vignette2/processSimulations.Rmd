@@ -64,12 +64,26 @@ modelArgs[P==32 | type=='ecoli', aspect2:='kcell']
 modelArgs[kcell == 1 & contam =='none' & P!=24 & (N==100  | type=='ecoli'), aspect3:='overall']
 modelArgs[,edges:=modeledges]
 
-renameDT <- data.table(L1=c('full', 'reg'), Method=c('Anisometric', 'Isometric'))
+renameDT <- data.table(L1=c('full', 
+                            'reg',
+                            'Gaussian', 
+                            'Logistic',
+                            'NPN', 
+                            'Aracne'
+                            ), 
+                       Method=c('Hurdle\n(Anisometric)', 
+                                'Hurdle\n(Isometric)',
+                                'Gaussian',
+                                'Logistic',
+                            'NPN', 
+                            'Aracne'))
+renameDT[,Method:=factor(Method, levels = Method[order(L1)])]
 for(i in seq_along(fittedmodels)){
     fittedmodels[[i]] <- rbindlist(fittedmodels[[i]], idcol='i')[!L1 %in% c('Cfull', 'Creg')]
 }
-allmodels <- rbindlist(fittedmodels, idcol='rep')
+allmodels <- rbindlist(fittedmodels, idcol='rep')[,Method:=NULL]
 allmodels[L1=='Aracne' & oracle=='BIC', FDR:=NA]
+allmodels = merge(allmodels, renameDT, by = 'L1')
 
 oracles <- allmodels[!is.na(oracle),.(sensitivity=mean(sensitivity), fdr=mean(FDR), sem_sens = sd(sensitivity)/sqrt(.N), sem_fdr = sd(FDR)/sqrt(.N)),keyby=list(L1, oracle, i)][modelArgs,,on='i']
 oracles[, Nfactor:=as.numeric(factor(N))]
@@ -87,6 +101,14 @@ Median monte carlo error
 ## Consistency by BIC
 ```{r bic_consistency}
 bic_plt <- ggplot(oracles[oracle=='BIC' & aspect1=='consistency'], aes(x=fdr, y=sensitivity, label=Nfactor, color=L1))+ geom_point(size=.1) + geom_text(vjust=0, hjust=0, size=3) + geom_path(aes(group=L1)) + facet_wrap(~type + contam, labeller=label_singleline) + ggtitle("Consistency and BIC tuning") + ylab('Sensitivity') + xlab('FDR')  + scale_color_discrete('Method')+ theme(legend.position=c(.8, .2))
+```
+
+## Timings
+```{r timings, dev = c('png', 'pdf'), fig.width = 3, fig.height = 3}
+timings = allmodels[,list(time = max(timing, na.rm = TRUE)),keyby=list(rep,i, Method)]
+timings = merge(timings, modelArgs, by = 'i')
+ggplot(timings[kcell==1 & contam =='none' & N <3000,], aes(x = P, y = time, color = Method))  + geom_smooth(se = FALSE) + scale_y_continuous(trans = 'log2') + scale_x_continuous(trans = 'log2') + ylab('Time(s)') + xlab('Number of nodes') + theme(legend.position = 'bottom', legend.text = element_text(size = 8), legend.key.size = unit(8, 'points')) + scale_color_discrete('')
+#legend.position = c(.2, .5), legend.background = element_rect(fill = "#00000000"))
 ```
 
 ```{r, eval=FALSE}
@@ -160,10 +182,4 @@ dim_scale_plt %+% oracles[oracle=='FDR' & N==100 & P!=24 & type  != 'ecoli'] + s
 
 ```{r draw_subset_roclike, dev=c('png', 'pdf'), fig.width=5, fig.height=5}
 roclike_plt %+% roclike[contam=='none'] + geom_point(data=bic[contam=='none'], pch=9) + theme(legend.position='bottom')
-```
-
-## Anova on simulation
-```{r}
-
-
 ```
