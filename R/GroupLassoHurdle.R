@@ -180,10 +180,9 @@ cgpaths <- function(y.zif, this.model, Blocks=Block(this.model), nodeId=NA_chara
         eig <- eigen(penMat[[b]])
         eigval[[b]] <- eig$values
         eigvec[[b]] <- eig$vectors
-        if(any(eig$values)<0){
+        if(any(eig$values<0)){
             warning('Negative eigenvalues in block ', b, " :'(")
             eig$values <- pmax(eig$values, 0)
-            browser()
             }
         sqrtPen[[b]] <- eig$vectors %*% sqrt(diag(eig$values)) %*% t(eig$vectors)
     }
