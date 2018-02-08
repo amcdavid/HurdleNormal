@@ -104,8 +104,19 @@ namedrbindlist <- function(li, nm=NULL, fill){
 
 }
 
+simplify_components <- function(select, min.components, gadj) {
+  clu <- components(gadj)
+  goodclu <- clu$membership[select]
+  badclu = which(clu$csize<min.components)
+  badclu <- setdiff(badclu, goodclu)
+  
+  badv = clu$membership %in% badclu
+  gadj <- delete.vertices(gadj, badv)
+  gadj
+}
 
-genNetwork <- function(hfit, nedge=40, min.components=3,min.degree.label=2,vnames, select, plot=TRUE, ...){
+
+genNetwork <- function(hfit, nedge=40, min.components=3,min.degree.label=2,vnames, select = numeric(), plot=TRUE, ...){
     ##interp <- length(hfit[[2]])-findInterval(nedge, rev(unlist(hfit[[2]])))
     interp <- which.min(abs(nedge-hfit$trueEdges))
 
@@ -116,18 +127,9 @@ genNetwork <- function(hfit, nedge=40, min.components=3,min.degree.label=2,vname
     sizes <- subset(sizes, i>j)[,'x']
     E(gadj)$width <- (abs(sizes)/max(abs(sizes)))^(1/4)
     E(gadj)$sign <- sign(sizes)
-    clu <- components(gadj)
-    if(!missing(select)){
-        goodclu <- clu$membership[select]
-        badclu <- setdiff(unique(clu$membership), goodclu)
-
-    } else{
-            badclu = which(clu$csize<min.components)
-        }
-
-    badv = clu$membership %in% badclu
-    gadj <- delete.vertices(gadj, badv)
+    gadj = simplify_components(select, min.components, gadj)
     
+   
     #gadj <- igraph::simplify(gadj, edge.attr.comb='mean')
     V(gadj)$size <- igraph::degree(gadj)/sqrt(max(igraph::degree(gadj)))
 
@@ -165,6 +167,23 @@ color.bar <- function(col, val, nticks=11) {
      rect(0,y,2,y+1/scale, col=col[i], border=NA)
     }
 }
+
+
+matplotNetwork <- function(plotitems, nedge=70, min.components=0, min.degree.label=-1, matplot=TRUE,  lay = igraph::layout_with_fr(g1, niter = 50), ...){
+    g1 <- genNetwork(plotitems[[1]], nedge=nedge, min.components=min.components,  plot=F, ...)
+    ni <- length(plotitems)
+    if(matplot){
+        par(mfrow=c(ceiling(sqrt(ni)), floor(sqrt(ni))), oma=c(0, 0,0,0)+.1, mar=c(0, 0, 3, 3)+.1)
+    } else{
+        par(oma=c(0,0, 0,0)+.1, mar=c(0, 0, 3, 0)+.1)
+    }
+    lapply(seq_along(plotitems), function(i){
+        gn <- genNetwork(plotitems[[i]], nedge=nedge, min.components=min.components, min.degree.label=min.degree.label, plot=F, ...)
+        plotNetwork(gn, layout=lay,  main=simpleCap(names(plotitems)[i]), ...)
+        sum(degree(gn))/2
+    })
+}
+
 
 plotNetwork <- function(gadj,  layout=layout_with_kk,  width.scale=2, colorbar=FALSE, colorbarx, colorbary, ...){
    
@@ -312,13 +331,13 @@ edgeGoAnno <- function(ginterp, n, graph, goAlias, goTerm, background, annotate=
                       TERM.j=stringr::str_wrap(TERM.j, width=35))]
         
         setkey(gcbgSig, phyperAdj)
-        return(list(gcbgSig, goTerm, esetij[GOID.i%in% goTerm$GOID]))
+        return(list(significant_sets = gcbgSig, go_definition = goTerm, significant_genes = esetij[GOID.i%in% goTerm$GOID]))
     } else{
-        return(gcbg)
+        return(sets = gcbg)
     }
 }
 
-plotgenesee <- function(x, godb, goTerm,network, goids, additionalGenes=NULL){
+plotgenesee <- function(x, godb, goTerm,network, goids, additionalGenes=NULL, plot = TRUE){
     L1 <- x$L1[1]
     geneseeG <- igraph::graph.edgelist(as.matrix(x[,.(GOID.i, GOID.j)]), directed=FALSE)
     E(geneseeG)$weights <- sqrt(-log10(x$phyper)-6)
@@ -349,8 +368,7 @@ plotgenesee <- function(x, godb, goTerm,network, goids, additionalGenes=NULL){
 
     ## top 10 terms no equal to unassociated set
     gselect <- unique(c(sgo$V, additionalGenes))
-    networkG <- genNetwork(network, 1400, plot=F, select=gselect)
-    networkG <- delete.vertices(networkG, igraph::degree(networkG)<1)
+    networkG <- genNetwork(network, 1400, plot=F, select=gselect, min.components = -1)
     V(networkG)$size <- 3
     E(networkG)$width <- 1
     ## select vertices in graph
@@ -370,7 +388,10 @@ plotgenesee <- function(x, godb, goTerm,network, goids, additionalGenes=NULL){
     V(networkG)$color <- paltable[,color]
     V(networkG)$label <- paltable[,ifelse(!is.na(category) | V %in% additionalGenes, V, '')]
     V(networkG)$label.color <- paltable[,ifelse(V %in% additionalGenes, 'red', 'black')]
-    plotNetwork(networkG, layout=layout_with_fr, vertex.label.cex=1)
+    sub_networkG = simplify_components(gselect, min.components = 3, networkG)
+    sub_networkG <- delete.vertices(sub_networkG, igraph::degree(sub_networkG)<1)
+    
+    plotNetwork(sub_networkG, layout=layout_with_fr, vertex.label.cex=1)
     setkey(goTerm, color)
     leg <- unique(goTerm, by='category')
     legend('bottomright', fill=leg[,color], legend=leg[,category])
@@ -381,5 +402,6 @@ plotgenesee <- function(x, godb, goTerm,network, goids, additionalGenes=NULL){
     geneseeG <- igraph::simplify(geneseeG, remove.multiple = TRUE, remove.loops = FALSE)
     plot(geneseeG, vertex.size=3, vertex.label.dist=.2, edge.width=E(geneseeG)$weights, layout=layout_with_kk, vertex.color=geneseeGtable$color, vertex.label.cex=1)
     legend('bottomright', fill=leg[,color], legend=leg[,category])
+    invisible(networkG)
 
 }
