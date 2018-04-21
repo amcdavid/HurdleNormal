@@ -124,6 +124,8 @@ autoGLM <- function(samp, fixed=NULL, parallel=FALSE, keepNodePaths=FALSE, check
     nid <- colnames(samp)
     blist <- singletonMap(ncol(samp)+ncol(fixed), ncol(fixed))
     
+    if(any(constant <- apply(samp, 2, var)<.Machine$double.eps)) warning(sum(constant), ' constant gene(s) found.  Dangerous ground; this may trigger an error in future versions.')
+    
     timing <- system.time(result <- applyfun(seq_len(ncol(samp)), function(i){
         model <- cbind(fixed, samp0[,-i])
         thisId <- nid[i]
@@ -158,7 +160,7 @@ autoLogistic <- autoGLM
 ## Refit the model with an unpenalized regression on the appropriate subsets
 refitGLMVector <- function(path, this.model, y.zif, blocks, family, fuzz=0){
     path_np = path
-    loglik_np = rep(99999999, nrow(path))
+    loglik_np = rep(NA_real_, nrow(path))
     for(i in seq_len(nrow(path))){
         activetheta <- which(abs(path[i,])>fuzz)
         activemm <- unique(na.omit(blocks$map[list(paridx=activetheta),mmidx, on='paridx']))
@@ -170,6 +172,9 @@ refitGLMVector <- function(path, this.model, y.zif, blocks, family, fuzz=0){
             p <- p + 1
         loglik_np[i] <- p - refit$aic/2
     }
+    ## This should only arise when we fit a constant gene somehow
+    ## Just zero out the log-likelihood
+    if(any(!is.finite(loglik_np))) loglik_np[] = 0
     list(path_np=path_np, loglik_np=loglik_np)
 }
 

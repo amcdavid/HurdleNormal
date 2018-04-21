@@ -101,7 +101,7 @@ neighborhoodToArray <- function(pathList, nknots, vnames=NULL, summaryFun=summar
         n_param_per_edge[[lidx]] <- sum(ag$npar)/
             (if(nnz[[lidx]]>0) nnz[[lidx]] else 1) #don't divide by zero
     }
-    out = list(adjMat=adjMat, trueEdges=unlist(nnz), lambda=lpath, pseudo_loglik_np=colSums(loglikmatrix), n_param_per_edge=unlist(n_param_per_edge))
+    out = list(adjMat=adjMat, trueEdges=unlist(nnz), lambda=lpath, pseudo_loglik_np=colSums(loglikmatrix, na.rm = TRUE), n_param_per_edge=unlist(n_param_per_edge))
     out$BIC = -2*out$pseudo_loglik_np + log(nobs)*out$trueEdges*out$n_param_per_edge
     BIC_etc <- data.table(trueEdges=out$trueEdges, lambda=out$lambda, pseudo_loglik_np=out$pseudo_loglik_np, BIC=out$BIC, adjMat_idx=seq_along(adjMat))
     out$BIC_etc <- BIC_etc
