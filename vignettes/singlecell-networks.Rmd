@@ -116,7 +116,7 @@ The edges are discovered by fitting a vector regression model gene by gene.
 Because it is a regression, it's easy to add covariates.
 In this case, we adjust for the cellular detection rate.
 ```{r, results='hide', message = FALSE, warning = FALSE}
-## options(mc.cores=4) #or however many your system has
+## options(mc.cores = min(1, parallel::detectCores() - 1)) #or however many your system has
 covariates = cbind(1, scale(shalek2014_list$cdata$
                                         ngeneson))
 ## Only fits a subset of genes so that the vignette compiles in a reasonable fashion

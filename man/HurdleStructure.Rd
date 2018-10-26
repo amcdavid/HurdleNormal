@@ -5,8 +5,8 @@
 \title{Structure to hold a model, samples and estimates}
 \usage{
 HurdleStructure(G = NULL, H = NULL, K = NULL, sample = NULL,
-  gibbs = TRUE, estimate = NULL, gibbs_args = list(kcell = 1, mvnorm =
-  FALSE))
+  gibbs = TRUE, estimate = NULL, gibbs_args = list(kcell = 1, mvnorm
+  = FALSE))
 }
 \arguments{
 \item{G}{symmetric discrete interaction matrix}

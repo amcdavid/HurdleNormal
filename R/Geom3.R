@@ -73,10 +73,11 @@ ggally_hurdle <- function(data, mapping, lwd.regression=1, lwd.axis=2, size.poin
 
 
 ##' @describeIn ggally_hurdle plot pairwise mosaic plots
+##' @importFrom ggplot2 quo_name
 ##' @export
 ggally_hmosaic <- function(data, mapping, ...){
-    var1 <- (abs(data[,deparse(mapping$x)])>0)*1
-    var2 <- (abs(data[,deparse(mapping$y)])>0)*1
+    var1 <- (abs(data[,quo_name(mapping$x)])>0)*1
+    var2 <- (abs(data[,quo_name(mapping$y)])>0)*1
     nm1 <- names(data)[2]
     nm2 <- names(data)[1]
     jointTable <- prop.table(table(var1, var2))

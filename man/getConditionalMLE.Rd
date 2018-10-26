@@ -4,8 +4,8 @@
 \alias{getConditionalMLE}
 \title{Loop over indices and solve condiiton MLE}
 \usage{
-getConditionalMLE(hs, using = "gibbs", testGrad = FALSE, engine = "R",
-  ...)
+getConditionalMLE(hs, using = "gibbs", testGrad = FALSE,
+  engine = "R", ...)
 }
 \arguments{
 \item{hs}{HurdleStructure}

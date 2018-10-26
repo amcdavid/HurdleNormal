@@ -4,8 +4,8 @@
 \alias{hn_plot}
 \title{Plot an igraph object}
 \usage{
-hn_plot(gadj, layout = layout_with_kk, width.scale = 2, colorbar = FALSE,
-  colorbarx, colorbary, ...)
+hn_plot(gadj, layout = layout_with_kk, width.scale = 2,
+  colorbar = FALSE, colorbarx, colorbary, ...)
 }
 \arguments{
 \item{gadj}{igraph object}
