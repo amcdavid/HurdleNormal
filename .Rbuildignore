@@ -1,3 +1,5 @@
+^Meta$
+^doc$
 .emacs.desktop
 die.R
 ^data-raw$

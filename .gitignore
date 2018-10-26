@@ -1,10 +1,12 @@
+Meta
+doc/
+!doc/singlecell-networks.html
 *~
 #*#
 .Rhistory
 inst/doc/
-!inst/doc/singlecell-networks.html
 .DS_Store
 .emacs.desktop
 .Rproj.user
-inst/vignette2/*chkpoint/
-inst/vignette2/*.RData
+inst/aoas_simulations/*chkpoint/
+inst/aoas_simulations/*.RData

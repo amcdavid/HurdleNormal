@@ -8,7 +8,7 @@ The main functionality is to estimate graphical models using group-lasso penaliz
 
 ## Vignette
 A vignette with an example is located
-[here](http://htmlpreview.github.io/?https://github.com/amcdavid/HurdleNormal/blob/master/inst/doc/singlecell-networks.html)
+[here](http://htmlpreview.github.io/?https://github.com/amcdavid/HurdleNormal/blob/master/doc/singlecell-networks.html)
 or with `vignette('singlecell-networks')`.
 
 ## Citation
