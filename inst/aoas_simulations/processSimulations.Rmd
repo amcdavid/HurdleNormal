@@ -21,7 +21,7 @@ fittedmodels <- lapply(sims_files, readRDS)
 ## Example of data distributions
 ```{r}
 plot_data_dist = function(i){
-    ggpairs(as.data.table(modelList[[i]]$gibbs[,1:3]), lower=list(continuous=ggally_hurdle), upper=list(continuous=HurdleNormal:::ggally_hmosaic)) +ggtitle(paste(modelArgs[i,], collapse = '/'))
+    ggpairs(as.data.table(modelList[[i]]$gibbs[,1:3]), lower=list(continuous=HurdleNormal:::ggally_hurdle), upper=list(continuous=HurdleNormal:::ggally_hmosaic)) +ggtitle(paste(modelArgs[i,], collapse = '/'))
 }
 ```
 

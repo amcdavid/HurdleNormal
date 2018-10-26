@@ -10,7 +10,7 @@ options(mc.cores=floor(MC_CORES/MODELS_PER_ARRAY))
 devtools::load_all('../..')
 source('common.R')
 source('simulation_library.R')
-writeModels <- FALSE
+writeModels <- !file.exists("simulation_graphs.RData")
 fitModels <- TRUE
 
 if(writeModels){

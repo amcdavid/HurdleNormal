@@ -39,10 +39,11 @@ Suggests:
     MAST,
     DT,
     Hmisc,
-    GGally
+    GGally,
+    dtplyr,
+    Cairo
 LinkingTo: RcppArmadillo,
     Rcpp
-Remotes: bioc::Release/Mus.musculus, bioc::Release/netbenchmark
 RoxygenNote: 6.1.0
 VignetteBuilder: knitr
 Encoding: UTF-8
