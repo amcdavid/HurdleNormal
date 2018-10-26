@@ -180,7 +180,6 @@ fitAndSummarize <- function(model, n=1000, makeModelArgs, maxFDR=.1, parallel=FA
     try(npn <- autoGLM(S.npn, nlambda=50,lambda.min.ratio = 0.1, family='gaussian', parallel=parallel))
     message('Logistic')
     ## pumped this up in order to handle strongly separated lambda sets and BIC estimation
-    ## something weird going there
     try(logiArr <- autoGLM(model$gibbs, lambda.min.ratio=.1, nlambda=50, parallel=parallel))
     ## add a mutation information method
     message('Aracne')
