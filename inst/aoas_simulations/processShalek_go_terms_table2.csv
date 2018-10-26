@@ -1,0 +1,427 @@
+GOID,TERM,human_name,definitions
+GO:0050798,activated T cell proliferation,activation,"activation: activation, differentiation, proliferation, transformation"
+GO:0002218,"activation of innate immune
+response",activation,"chemokinesis: chemokine response, signaling or production"
+GO:0002526,acute inflammatory response,activation,"endosome: endosome, lysome, secresome"
+GO:0060612,adipose tissue development,NA,RNA: RNA transcription/translation
+GO:0008209,androgen metabolic process,NA,
+GO:0019882,antigen processing and presentation,NA,
+GO:0042590,"antigen processing and presentation
+of exogenous peptide antigen via
+MHC class I",NA,
+GO:0019886,"antigen processing and presentation
+of exogenous peptide antigen via
+MHC class II",NA,
+GO:0016324,apical plasma membrane,NA,
+GO:0030424,axon,NA,
+GO:0090544,BAF-type complex,NA,
+GO:1904288,BAT3 complex binding,NA,
+GO:0001540,beta-amyloid binding,NA,
+GO:0004563,"beta-N-acetylhexosaminidase
+activity",NA,
+GO:0016493,C-C chemokine receptor activity,chemokinesis,
+GO:0030246,carbohydrate binding,NA,
+GO:0005901,caveola,NA,
+GO:0030014,CCR4-NOT complex,NA,
+GO:0001775,cell activation,activation,
+GO:0007155,cell adhesion,activation,
+GO:0048469,cell maturation,activation,
+GO:0009986,cell surface,activation,
+GO:0007044,cell-substrate junction assembly,NA,
+GO:0045123,cellular extravasation,NA,
+GO:0071222,"cellular response to
+lipopolysaccharide",activation,
+GO:0071229,cellular response to acid chemical,activation,
+GO:0071346,"cellular response to interferon-
+gamma",activation,
+GO:0071347,cellular response to interleukin-1,activation,
+GO:0071353,cellular response to interleukin-4,activation,
+GO:0034599,"cellular response to oxidative
+stress",activation,
+GO:0006882,cellular zinc ion homeostasis,NA,
+GO:0051085,"chaperone mediated protein folding
+requiring cofactor",NA,
+GO:0008009,chemokine activity,chemokinesis,
+GO:0070098,"chemokine-mediated signaling
+pathway",chemokinesis,
+GO:0033344,cholesterol efflux,NA,
+GO:0006338,chromatin remodeling,NA,
+GO:0005518,collagen binding,NA,
+GO:0030574,collagen catabolic process,NA,
+GO:0045236,CXCR chemokine receptor binding,chemokinesis,
+GO:0019955,cytokine binding,chemokinesis,
+GO:0004896,cytokine receptor activity,chemokinesis,
+GO:0005737,cytoplasm,NA,
+GO:0016023,"cytoplasmic membrane-bounded
+vesicle",NA,
+GO:0005881,cytoplasmic microtubule,NA,
+GO:0005829,cytosol,NA,
+GO:0022625,cytosolic large ribosomal subunit,RNA,
+GO:0022627,cytosolic small ribosomal subunit,RNA,
+GO:0006952,defense response,activation,
+GO:0050829,"defense response to Gram-negative
+bacterium",activation,
+GO:0050830,"defense response to Gram-positive
+bacterium",activation,
+GO:0042832,defense response to protozoan,activation,
+GO:0051607,defense response to virus,activation,
+GO:0032497,detection of lipopolysaccharide,activation,
+GO:0010273,detoxification of copper ion,activation,
+GO:0071897,DNA biosynthetic process,NA,
+GO:0030330,"DNA damage response, signal
+transduction by p53 class mediator",activation,
+GO:0005662,DNA replication factor A complex,activation,
+GO:0008094,DNA-dependent ATPase activity,NA,
+GO:0003725,double-stranded RNA binding,RNA,
+GO:0006855,drug transmembrane transport,endosome,
+GO:0035987,endodermal cell differentiation,endosome,
+GO:0004175,endopeptidase activity,endosome,
+GO:0034663,"endoplasmic reticulum chaperone
+complex",endosome,
+GO:0005788,endoplasmic reticulum lumen,endosome,
+GO:0005793,"endoplasmic reticulum-Golgi
+intermediate compartment",endosome,
+GO:0043542,endothelial cell migration,chemokinesis,
+GO:0097009,energy homeostasis,NA,
+GO:0048245,eosinophil chemotaxis,chemokinesis,
+GO:0008210,estrogen metabolic process,NA,
+GO:0043928,"exonucleolytic nuclear-transcribed
+mRNA catabolic process involved in
+deadenylation-dependent decay",RNA,
+GO:0009897,external side of plasma membrane,endosome,
+GO:0070062,extracellular exosome,endosome,
+GO:0005615,extracellular space,endosome,
+GO:1903561,extracellular vesicle,endosome,
+GO:0031313,"extrinsic component of endosome
+membrane",endosome,
+GO:0060613,fat pad development,NA,
+GO:0008585,female gonad development,NA,
+GO:0007144,female meiosis I,NA,
+GO:0017134,fibroblast growth factor binding,activation,
+GO:0005925,focal adhesion,activation,
+GO:0008347,glial cell migration,activation,
+GO:0006346,GO:0006346,NA,
+GO:0000137,Golgi cis cisterna,endosome,
+GO:0007030,Golgi organization,endosome,
+GO:0005795,Golgi stack,endosome,
+GO:0019838,growth factor binding,activation,
+GO:0020037,heme binding,NA,
+GO:0008201,heparin binding,NA,
+GO:0034113,heterotypic cell-cell adhesion,activation,
+GO:0048872,homeostasis of number of cells,activation,
+GO:0042562,hormone binding,chemokinesis,
+GO:0016798,"hydrolase activity, acting on
+glycosyl bonds",NA,
+GO:0021888,"hypothalamus gonadotrophin-
+releasing hormone neuron
+development",NA,
+GO:0019864,IgG binding,chemokinesis,
+GO:0016064,"immunoglobulin mediated immune
+response",chemokinesis,
+GO:0006954,inflammatory response,activation,
+GO:0033622,integrin activation,activation,
+GO:0005178,integrin binding,activation,
+GO:0002192,"IRES-dependent translational
+initiation",NA,
+GO:0030984,kininogen binding,chemokinesis,
+GO:0005770,late endosome,endosome,
+GO:0030595,leukocyte chemotaxis,chemokinesis,
+GO:0002523,"leukocyte migration involved in
+inflammatory response",chemokinesis,
+GO:0033327,Leydig cell differentiation,activation,
+GO:0016298,lipase activity,endosome,
+GO:0005811,lipid particle,endosome,
+GO:0019915,lipid storage,endosome,
+LPS:-:-1,LPS:-:-1,LPS,
+LPS:-:1,LPS:-:1,LPS,
+LPS:**:-1,LPS:**:-1,LPS,
+LPS:***:-1,LPS:***:-1,LPS,
+LPS:***:1,LPS:***:1,LPS,
+GO:0030324,lung development,NA,
+GO:0005764,lysosome,endosome,
+GO:0048246,macrophage chemotaxis,chemokinesis,
+GO:0006108,malate metabolic process,NA,
+GO:0008584,male gonad development,NA,
+GO:0007141,male meiosis I,NA,
+GO:0030490,maturation of SSU-rRNA,RNA,
+GO:0000462,"maturation of SSU-rRNA from
+tricistronic rRNA transcript (SSU-
+rRNA, 5.8S rRNA, LSU-rRNA)",RNA,
+GO:0016020,membrane,endosome,
+GO:0045340,mercury ion binding,NA,
+GO:0008327,methyl-CpG binding,NA,
+GO:0042288,MHC class I protein binding,endosome,
+GO:0023026,"MHC class II protein complex
+binding",endosome,
+GO:0005874,microtubule,NA,
+GO:0007019,microtubule depolymerization,NA,
+GO:0005902,microvillus,NA,
+GO:0042474,middle ear morphogenesis,NA,
+GO:0005762,"mitochondrial large ribosomal
+subunit",RNA,
+GO:0005739,mitochondrion,NA,
+GO:0047497,"mitochondrion transport along
+microtubule",NA,
+GO:0007076,mitotic chromosome condensation,NA,
+GO:0007052,mitotic spindle organization,NA,
+GO:0002548,monocyte chemotaxis,chemokinesis,
+GO:0005771,multivesicular body,NA,
+GO:0001779,natural killer cell differentiation,activation,
+GO:0032693,"negative regulation of
+interleukin-10 production",activation,
+GO:0032700,"negative regulation of
+interleukin-17 production",activation,
+GO:0033147,"negative regulation of
+intracellular estrogen receptor
+signaling pathway",NA,
+GO:0045947,"negative regulation of
+translational initiation",NA,
+GO:0016525,negative regulation of angiogenesis,NA,
+GO:0043518,"negative regulation of DNA damage
+response, signal transduction by
+p53 class mediator",activation,
+GO:0044130,"negative regulation of growth of
+symbiont in host",activation,
+GO:0002862,"negative regulation of inflammatory
+response to antigenic stimulus",activation,
+GO:1902166,"negative regulation of intrinsic
+apoptotic signaling pathway in
+response to DNA damage by p53 class
+mediator",NA,
+GO:0002906,"negative regulation of mature B
+cell apoptotic process",activation,
+GO:0031115,"negative regulation of microtubule
+polymerization",NA,
+GO:0045662,"negative regulation of myoblast
+differentiation",activation,
+GO:2000009,"negative regulation of protein
+localization to cell surface",endosome,
+GO:0050709,"negative regulation of protein
+secretion",endosome,
+GO:0048387,"negative regulation of retinoic
+acid receptor signaling pathway",NA,
+GO:0048662,"negative regulation of smooth
+muscle cell proliferation",activation,
+GO:0045581,"negative regulation of T cell
+differentiation",activation,
+GO:0002829,"negative regulation of type 2
+immune response",activation,
+GO:0032897,"negative regulation of viral
+transcription",activation,
+GO:0046597,"negative regulation of viral entry
+into host cell",activation,
+GO:0045071,"negative regulation of viral genome
+replication",activation,
+GO:0030178,"negative regulation of Wnt
+signaling pathway",NA,
+GO:0045060,negative thymic T cell selection,activation,
+GO:0048812,neuron projection morphogenesis,NA,
+GO:0007263,"nitric oxide mediated signal
+transduction",NA,
+GO:0042405,nuclear inclusion body,NA,
+GO:0070966,"nuclear-transcribed mRNA catabolic
+process, no-go decay",RNA,
+GO:0005730,nucleolus,NA,
+GO:0007000,nucleolus organization,NA,
+GO:0005654,nucleoplasm,NA,
+GO:0005634,nucleus,NA,
+PAM:-:-1,PAM:-:-1,PAM,
+PAM:-:1,PAM:-:1,PAM,
+PAM:*:1,PAM:*:1,PAM,
+PAM:***:-1,PAM:***:-1,PAM,
+PAM:***:1,PAM:***:1,PAM,
+GO:0016504,peptidase activator activity,NA,
+GO:0042277,peptide binding,NA,
+GO:0018149,peptide cross-linking,NA,
+GO:0005778,peroxisomal membrane,NA,
+GO:0006909,phagocytosis,endosome,
+GO:0033700,phospholipid efflux,NA,
+GO:0005886,plasma membrane,endosome,
+GO:0044822,poly(A) RNA binding,RNA,
+GO:0004535,"poly(A)-specific ribonuclease
+activity",RNA,
+GO:0004652,"polynucleotide adenylyltransferase
+activity",RNA,
+GO:0032733,"positive regulation of
+interleukin-10 production",activation,
+GO:0032735,"positive regulation of
+interleukin-12 production",activation,
+GO:0032740,"positive regulation of
+interleukin-17 production",activation,
+GO:0045086,"positive regulation of
+interleukin-2 biosynthetic process",activation,
+GO:0032743,"positive regulation of
+interleukin-2 production",activation,
+GO:0045416,"positive regulation of
+interleukin-8 biosynthetic process",activation,
+GO:0042327,"positive regulation of
+phosphorylation",NA,
+GO:1990440,"positive regulation of
+transcription from RNA polymerase
+II promoter in response to
+endoplasmic reticulum stress",RNA,
+GO:0061419,"positive regulation of
+transcription from RNA polymerase
+II promoter in response to hypoxia",RNA,
+GO:0042104,"positive regulation of activated T
+cell proliferation",activation,
+GO:0030890,"positive regulation of B cell
+proliferation",activation,
+GO:0051099,positive regulation of binding,activation,
+GO:0045785,"positive regulation of cell
+adhesion",activation,
+GO:0045597,"positive regulation of cell
+differentiation",activation,
+GO:0051272,"positive regulation of cellular
+component movement",NA,
+GO:0002693,"positive regulation of cellular
+extravasation",NA,
+GO:2000343,"positive regulation of chemokine
+(C-X-C motif) ligand 2 production",chemokinesis,
+GO:0050921,positive regulation of chemotaxis,chemokinesis,
+GO:0050715,"positive regulation of cytokine
+secretion",chemokinesis,
+GO:0001961,"positive regulation of cytokine-
+mediated signaling pathway",chemokinesis,
+GO:0010606,"positive regulation of cytoplasmic
+mRNA processing body assembly",RNA,
+GO:0048146,"positive regulation of fibroblast
+proliferation",activation,
+GO:0010628,"positive regulation of gene
+expression",RNA,
+GO:0032725,"positive regulation of granulocyte
+macrophage colony-stimulating
+factor production",activation,
+GO:0050729,"positive regulation of inflammatory
+response",activation,
+GO:0045078,"positive regulation of interferon-
+gamma biosynthetic process",activation,
+GO:1902255,"positive regulation of intrinsic
+apoptotic signaling pathway by p53
+class mediator",NA,
+GO:0002690,"positive regulation of leukocyte
+chemotaxis",chemokinesis,
+GO:0002687,"positive regulation of leukocyte
+migration",chemokinesis,
+GO:0050671,"positive regulation of lymphocyte
+proliferation",activation,
+GO:0060907,"positive regulation of macrophage
+cytokine production",chemokinesis,
+GO:0090026,"positive regulation of monocyte
+chemotaxis",chemokinesis,
+GO:0045672,"positive regulation of osteoclast
+differentiation",activation,
+GO:0010862,"positive regulation of pathway-
+restricted SMAD protein
+phosphorylation",NA,
+GO:0050731,"positive regulation of peptidyl-
+tyrosine phosphorylation",NA,
+GO:0043068,"positive regulation of programmed
+cell death",activation,
+GO:1903078,"positive regulation of protein
+localization to plasma membrane",endosome,
+GO:0034393,"positive regulation of smooth
+muscle cell apoptotic process",NA,
+GO:0050870,"positive regulation of T cell
+activation",activation,
+GO:0010820,"positive regulation of T cell
+chemotaxis",chemokinesis,
+GO:0045582,"positive regulation of T cell
+differentiation",activation,
+GO:0001916,"positive regulation of T cell
+mediated cytotoxicity",activation,
+GO:0042102,"positive regulation of T cell
+proliferation",activation,
+GO:0002827,"positive regulation of T-helper 1
+type immune response",activation,
+GO:0070245,"positive regulation of thymocyte
+apoptotic process",NA,
+GO:0001798,"positive regulation of type IIa
+hypersensitivity",NA,
+GO:0042517,"positive regulation of tyrosine
+phosphorylation of Stat3 protein",RNA,
+GO:0042523,"positive regulation of tyrosine
+phosphorylation of Stat5 protein",RNA,
+GO:0046598,"positive regulation of viral entry
+into host cell",activation,
+GO:0045059,positive thymic T cell selection,activation,
+GO:0010608,"posttranscriptional regulation of
+gene expression",RNA,
+GO:0015459,"potassium channel regulator
+activity",NA,
+GO:0070883,pre-miRNA binding,RNA,
+GO:0001516,prostaglandin biosynthetic process,NA,
+GO:0005839,proteasome core complex,NA,
+GO:0044183,"protein binding involved in protein
+folding",NA,
+GO:0006461,protein complex assembly,NA,
+GO:0006611,protein export from nucleus,NA,
+GO:0071108,protein K48-linked deubiquitination,NA,
+GO:0034504,protein localization to nucleus,NA,
+GO:0006479,protein methylation,NA,
+GO:0043621,protein self-association,NA,
+GO:0043113,receptor clustering,NA,
+GO:0086004,"regulation of cardiac muscle cell
+contraction",NA,
+GO:0030155,regulation of cell adhesion,activation,
+GO:0008360,regulation of cell shape,activation,
+GO:0051881,"regulation of mitochondrial
+membrane potential",NA,
+GO:1901214,regulation of neuron death,NA,
+GO:0030278,regulation of ossification,NA,
+GO:0050730,"regulation of peptidyl-tyrosine
+phosphorylation",NA,
+GO:0061136,"regulation of proteasomal protein
+catabolic process",NA,
+GO:0032880,regulation of protein localization,NA,
+GO:0010574,"regulation of vascular endothelial
+growth factor production",NA,
+GO:0005657,replication fork,NA,
+GO:0010447,response to acidic pH,activation,
+GO:0035455,response to interferon-alpha,chemokinesis,
+GO:0035456,response to interferon-beta,chemokinesis,
+GO:0034341,response to interferon-gamma,chemokinesis,
+GO:0014070,response to organic cyclic compound,activation,
+GO:0009651,response to salt stress,activation,
+GO:0034612,response to tumor necrosis factor,chemokinesis,
+GO:0010224,response to UV-B,activation,
+GO:0009615,response to virus,activation,
+GO:0042273,ribosomal large subunit biogenesis,RNA,
+GO:0000028,ribosomal small subunit assembly,RNA,
+GO:0042274,ribosomal small subunit biogenesis,RNA,
+GO:0090503,"RNA phosphodiester bond hydrolysis,
+exonucleolytic",RNA,
+GO:0043631,RNA polyadenylation,RNA,
+GO:0001102,"RNA polymerase II activating
+transcription factor binding",RNA,
+GO:0005791,rough endoplasmic reticulum,endosome,
+GO:0048237,rough endoplasmic reticulum lumen,endosome,
+GO:0006364,rRNA processing,RNA,
+GO:0032940,secretion by cell,endosome,
+GO:0030141,secretory granule,endosome,
+GO:0072520,seminiferous tubule development,NA,
+GO:0019233,sensory perception of pain,NA,
+GO:0015935,small ribosomal subunit,RNA,
+GO:0046624,sphingolipid transporter activity,RNA,
+GO:0003735,structural constituent of ribosome,RNA,
+GO:0019905,syntaxin binding,endosome,
+GO:0042093,T-helper cell differentiation,activation,
+GO:0070053,thrombospondin receptor activity,NA,
+GO:0030140,"trans-Golgi network transport
+vesicle",endosome,
+GO:0006412,translation,RNA,
+GO:0031369,"translation initiation factor
+binding",RNA,
+GO:0003747,translation release factor activity,RNA,
+GO:0006388,"tRNA splicing, via endonucleolytic
+cleavage and ligation",RNA,
+GO:0015631,tubulin binding,NA,
+GO:0045298,tubulin complex,NA,
+GO:0060337,type I interferon signaling pathway,chemokinesis,
+GO:0010992,ubiquitin homeostasis,NA,
+GO:0031625,ubiquitin protein ligase binding,NA,
+GO:0004843,"ubiquitin-specific protease
+activity",NA,
+GO:0005773,vacuole,NA,
+GO:0034098,VCP-NPL4-UFD1 AAA ATPase complex,NA,
+GO:0042060,wound healing,NA,
