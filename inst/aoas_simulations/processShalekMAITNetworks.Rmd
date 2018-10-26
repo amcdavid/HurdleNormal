@@ -17,7 +17,7 @@ source('common.R')
 knitr::opts_chunk$set(cache=TRUE, autodep=TRUE, echo=FALSE, error=FALSE, warning=FALSE)
 
 #Set to false if Tfh data is not present
-EVAL_TFH <- TRUE
+EVAL_TFH <- FALSE
 ```
 
 ```{r loadAlex, cache=FALSE, eval=FALSE}
@@ -64,12 +64,6 @@ merge(godb, topdegree, by='gene')
 
 ```
 
-
-```{r, results='asis'}
-knitr::kable(BIC_all[,.(BICedges = edges[which.min(BIC)], maxEdges=max(edges)),keyby=list(method)])
-
-
-```
 
 For mouse, these are derived from the go assocdb database, time stamp 20150919.
 ```{r go_results}
@@ -251,7 +245,11 @@ cowplot::plot_grid(bic_alex_plot , bic_tfh_plot + coord_cartesian(xlim=c(0, 200)
 bic_alex_plot+ facet_wrap(~Method, scales ='free_y', ncol = 2)
 ```
 
+```{r, results='asis'}
+knitr::kable(BIC_all[,.(BICedges = edges[which.min(BIC)], maxEdges=max(edges)),keyby=list(method)])
 
+
+```
 
 ```{r, results='asis'}
 knitr::kable(BIC_tfh[,.(BICedges = edges[which.min(BIC)], maxEdges=max(edges)),keyby=list(Method)])
