@@ -6,3 +6,4 @@ die.R
 ^.*\.Rproj$
 ^\.Rproj\.user$
 inst/vignette2/
+inst/aoas_simulations/

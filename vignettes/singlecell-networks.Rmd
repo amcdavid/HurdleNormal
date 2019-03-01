@@ -9,11 +9,14 @@ vignette: >
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
+\newcommand{\bY}{\mathbf Y}
+\newcommand{\bZ}{\mathbf Z}
+\newcommand{\Cov}{\mathrm{Cov}}
 
 ## Graphical models to learn about co-expression
 There are number of good reasons to go to the trouble and expensive of isolating single cells to study gene expression in them.
 The inference of patterns of association, and perhaps ultimately cause and effect is one of them. 
-Markov graphical models have been a popular method to describe association relationships between genes in bulk gene expression experiments.
+Markov graphical models have been a popular method to describe associative relationships between genes in bulk gene expression experiments.
 Each gene is a node in a graph, and the absence of an edge connecting
 two indicates an absence of a regulatory
 link.^[More precisely, a conditional independence in expression.]
@@ -41,12 +44,7 @@ Then the sum of expression observed in \emph{bulk} experiments is
 \mathbf{Z} = \sum_i^n \mathbf{Y}_i.
 \]
 
-If the distribution of $\mathbf{Y}_i$ obeys some conditional independence relationships, in general the distribution of $\mathbf{Z}$ does not obey these same relationships.  
-For example, take $p=3$ and suppose that $\mathbf{Y}_i$  are \emph{iid} samples from a tri-variate distribution $[Y_1, Y_2, Y_3]$ on $\left\{0,  1 \right\}^3$.  Suppose the probability mass function (PMF) factors as $p(y_1, y_2, y_3) = p(y_1) p(y_2|y_1) p(y_3|y_2)$, that is $Y_1$ and $Y_3$ are conditionally independent given $Y_2$, or in symbols $Y_1 \perp Y_3 | Y_2$.  
-Then $p(y_3, y_2|y_1) = p(y_2|y_1) p(y_3|y_2)$, which is equivalent to saying that each $2\times2$ probability table $p(y_3, y_2|y_1=j)$, $j=0,1$ has non-negative rank one.  
-Yet even summing over $n=2$ cells, the PMF of $\mathbf Z = \mathbf{Y_1} +\mathbf{ Y_2}$ will not generally factor as such, as one may exhibit a $3 \times 3$ probability table for $p(z_3, z_2 | z_1)$. 
-
-For example, here we simulate variables following a multivariate hurdle model (see next section) that obey the above conditional independence relationship.
+If the distribution of $\mathbf{Y}_i$ obeys some conditional independence relationships, in general the distribution of $\mathbf{Z}$ does not obey these same relationships.  For example, we simulate variables following a tri-variate hurdle model (see succeeding section) that obey the conditional independence relationship $p(y_1, y_2, y_3) = p(y_1) p(y_2|y_1) p(y_3|y_2)$.  In other words, $Y_1$ and $Y_3$ are conditionally independent given $Y_2$, or in symbols $Y_1 \perp Y_3 | Y_2$. 
 The values in `y` could represent expression found in single cells.
 ```{r}
 library(HurdleNormal)
@@ -59,7 +57,7 @@ H = matrix(c(5, 0, 0,
              0, 5, 0,
              0, 0, 5), nrow=3)
 K = diag(1, nrow=3)
-y = as.data.frame(rGibbsHurdle(G, H, K, 301000, thin = .01, burnin=1000))
+y = as.data.frame(rGibbsHurdle(G, H, K, 301000, thin = .04, burnin=1000))
 ggpairs(y, upper=list(continuous=ggally_hurdle), lower=list(continuous=ggally_hmosaic))
 testBinaryIndependence = function(ydat, x0,r){
     yprime = with(ydat, data.frame(A1=(abs(V1-x0)<r)*1, A2=(abs(V2-x0)<r)*1, A3=(abs(V3-x0)<r)*1))
@@ -71,16 +69,105 @@ testBinaryIndependence = function(ydat, x0,r){
 testBinaryIndependence(y[seq(1, nrow(y), by=2),], x0=5, r=3)
 ```
 When we fit an appropriate log-linear model^[Here we test that the events $A_1 \perp A_2 | A_3$ where $A_i$ is the event that $Y_i$ lies in some interval, which of course is only a necessary condition for $Y_1 \perp Y_2 | Y_3$ but not sufficient.], we find that the `A3` coefficient is not significantly different from zero, while `A2` is, implying the model  $Y_1 \perp Y_3 | Y_2$.
-When we take the convolution that sums pairs of observations, independence no longer holds.
+When we take the convolution that sums quartets of observations, independence no longer holds.
 ```{r}
 z = y[seq(1, nrow(y), by=4),] + y[seq(2, nrow(y), by=4),] + y[seq(3, nrow(y), by=4),] +  y[seq(4, nrow(y), by=4),]
 ggpairs(z, upper=list(continuous=ggally_hurdle), lower=list(continuous=ggally_hmosaic))
 testBinaryIndependence(z, x0=10, r=5)
 ```
 
-
 The infamous case in which graphical structure commutes under convolution is when the $\mathbf{Y}_i$ are multivariate Normal. 
 But single cell gene expression is zero-inflated, and not plausibly described by a multivariate Normal distribution.   
+
+### What about temporal orderings?
+
+If one could follow the expression patterns of a cell across time, then vector auto-regression or linear differential equation modeling would be just the ticket.  As of early 2019, scRNAseq remains a destructive process, providing only a snapshot of a cell.  On the other hand, it's interesting to contemplate if the (latent) effective time point could be inferred de novo when temporal effects largely drive patterns of gene expression in a population of cells.   Over a dozen  algorithms have been proposed to do just that, often describing their target of inference to be the *pseudotime* of a cell.  Several authors have proposed "plug in" the pseudotime estimates into an auto-regressive model and then learn temporal patterns of association.  [Qui, et al (2019+)](https://doi.org/10.1101/426981) propose a method called **Scribe**, which combines pseudotime and criteria to estimate mutual information scores. [Deshpande, et al (2019)+](https://doi.org/10.1101/534834) combine pseudotime and tests for Granger Causality in their method **SCINGE**.  [**SCODE**](https://doi.org/10.1093/bioinformatics/btx194), proposed in 2017 by Matsumoto and co-authors used pseudotime to fit ordinary differential equations. 
+
+This has been challenging for several reasons. First, the performance of even state-of-the-art pseudotime algorithms can be limited (for instance see [Saelens, et al 2019+](https://www.biorxiv.org/content/10.1101/276907v1)), and one must choose among algorithms with few heuristics, let alone ground truth.  Second, the "plugin" nature of the procedure will tend to underestimate inferential variability due to uncertainty in the pseudotimes.  Lastly, using the same data to both estimate the pseudotime, and estimate correlations between cells could contribute to difficult-to-diagnose overfitting, depending on how stringently the pseudotime algorithms and autoregressive models control false positives.
+
+On the other hand, multivariate, parametric models are more inferentially transparent, provide goodness-of-fit diagnostics, and principled ways to chose tuning parameters.  Their downside is that if you live by the parametric model, you shall die by the parametric model.  However, a sufficiently flexible model that employs shrinkage can "gracefully" degrade in performance.  This is the objective of this work.
+
+## Precision matrices and convolutions
+
+Additional interesting phenomena can be seen when considering more complicated graph topologies. 
+
+```{r topologies, dev = c('png', 'pdf'), fig.width = 5, fig.height = 3}
+library(igraph)
+library(dplyr)
+
+n_vertex = 6
+weight = 1.5
+n_samp = 2e5
+pal = colorRamp(rev(viridis::magma(6)))
+topologies = list(chain = make_ring(n_vertex, directed = FALSE), 
+                  hub = make_star(n_vertex, mode = 'undirected'),
+                  lattice = make_lattice(c(n_vertex/2, 2), directed = FALSE))
+adj_mat = purrr::map(topologies, function(x){
+    m = as.matrix(Matrix::tril(igraph::get.adjacency(x)))
+    m[m>0] = weight*(-1)^seq_len(sum(m>0))
+    diag(m) = -(rowSums(m) + colSums(m))
+    (m + t(m))
+})
+
+layouts = purrr::map(topologies, layout_nicely)
+par(mfrow = c(1,3), mai = c(0, 0, 0, 0) + .1, omi = c(0, 0, 0, 0) + .1)
+purrr::imap(topologies, ~ plot(.x, main = .y, layout = layouts[[.y]], vertex.label = NA))
+```
+
+Here we consider a 6-chain, a 6-star, and a lattice on 6 vertices.  The edge weights (corresponding to conditional log-odds) are equal to `r weight` but alternate in sign.
+
+```{r}
+grid = data_frame(topo = c('chain', 'hub', 'lattice'))
+
+clamp = function (x, modulus = 5) 
+{
+    x[x < -modulus] = -modulus
+    x[x > modulus] = modulus
+    x
+}
+
+make_plotable_graph = function(topo){
+    mat = adj_mat[[topo]]
+    initial = 1*(abs(rGibbsHurdle(G = mat, H = diag(n_vertex), K = diag(n_vertex), burnin = 1000, Nkeep = n_samp, thin = .1))>0)
+    pcor = cov2cor(solve(cor(initial)))
+    tcor = pcor * sqrt((nrow(initial) - ncol(initial) - 2)/(1-pcor^2))
+    tcor[abs(tcor) < 4] = 0
+    g = graph_from_adjacency_matrix(-tcor, weighted = TRUE, diag = FALSE, mode = 'undirected')
+    E(g)$weight = clamp(E(g)$weight, 20)
+    lab = round(E(g)$weight, 0)
+    E(g)$label = as.character(lab)#ifelse(abs(lab) > 20, str_c(as.character(lab), '')
+    g$layout = layouts[[topo]]
+    g
+}
+
+grid_graph = grid %>% rowwise() %>% mutate(graph = list(make_plotable_graph(topo)))
+```
+
+Now we generate some Ising data $\bY$, calculate the partial correlations, t-statistics, and use the t-statistics as edge weights to indicate significant ($|t|>4$) non-zeroes in the precision matrix.  We could consistently estimate the Ising interaction matrix, hence recover the structure, if we fit a series of logistic regressions [for instance @Besag1974a].  Instead, working with the partial correlations is equivalent to working with a series of linear regressions.
+
+```{r convolution_demo, dev = c('png', 'pdf'), results = 'hide', fig.width = 5, fig.height = 3}
+hide = grid_graph %>% ungroup() %>% do({
+   par(mfrow = c(1,3), mai = c(0, 0, 0, 0) + .1, omi = c(0, 0, 0, 0) + .1)
+    purrr::pmap(., ~plot(..2, main = ..1,  vertex.label = NA))
+    data_frame()
+})
+```
+
+And in fact, this model suffices to characterize the behavior in the bulk setting of aggregating expression by summing across Ising-cells: if $\Cov \bY = \Sigma$ then $\Cov \left[ \sum_{i= 1}^n \bY_i \right] = n \Sigma$.  So examining the covariance, and its inverse shows what happens to the network structure if we aggregated $\bY$.  Measuring dependence with the inverse covariance (as opposed to the conditional log odds) distorts the structure in the same way that measuring aggregates of cells (as opposed to single cells) distorts the structure.
+
+Loh and Wainwright [-@Loh2013] studied this problem in greater detail in the context of using the inverse covariance matrix induced from an Ising model to learn its structure.  They showed that induced edges correspond to triangulations of the Ising graph.  Since the hub graph, actually a tree, has no chordless cycles of length $>3$, no spurious edges are induced there.  On the other hand, triangulation of the lattice induces many additional edges, as is seen here.
+
+A second observation, which is evident when examining the partial correlation matrices, is that the induced edges are a second-order phenomena.  They are an order of magnitude weaker in effect size than the true edges.  This can be explained as well: induced edges arise from the difference between link functions in a linear versus logistic regression, and this difference is not always very large.  A corollary of this is that the stronger the Ising interactions, the greater the strength of the induced edges will be, and if this signal is very small, the induced edges may vanish into the background.
+
+```{r, fig.width = 5, fig.height = 5, dev = c('png', 'pdf')}
+curve( (1+exp(-x))^(-1), xlim = c(-4, 4), lwd = 2, xlab = 'Linear predictor', ylab = 'Expected value')
+abline(a = 0.5, b = .25, col = 'red', lwd = 2)
+legend('topleft', legend = c('Inverse logit', 'linear'), col = c('black', 'red'), lwd = 2)
+
+```
+
+
+The inverse logistic link **is** pretty linear, at least on the interval [-1, 1].  So the effect will be most pronounced when the linear predictors for observations is outside the interval [.27, .73].  On the other hand, this difference in link functions is expected to play a role when tuning the networks, which is what we find.
 
 ## An example of fitting the network
 ```{r}
@@ -108,8 +195,8 @@ ggpairs(as.data.frame(exp1h_trans[,c('MGL2', 'MX1', 'H2.AA')]),upper=list(contin
 
 Conditionally centering the non-zero values in the data makes the discrete and continuous
 components orthogonal.
-This does change the problem slightly, but improves the geometry of
-the log-likelihood, significantly speeding convergence.
+This improves the geometry of
+the log-likelihood, significantly speeding convergence.^[The problem it solves is not equivalent, but this centering could be thought to encode knowledge that the gap between "zero" and "non-zero" depends on technical factors like the number of amplification cycles, so the estimator should be made invariant to these factors.]
 
 
 The edges are discovered by fitting a vector regression model gene by gene.
@@ -136,9 +223,9 @@ parameter count per edge, and the Bayesian information criterion (`BIC`).
 ### Model selection and complexity
 ```{r}
 BIC_etc <- hurdle_fit$BIC_etc
-BIC_etc[BIC>=max(BIC),isMax:=TRUE][,idx:=.I]
+BIC_etc[BIC<=min(BIC),isMin:=TRUE][,idx:=.I]
 lambda_axis <- with(BIC_etc, approxfun(trueEdges, lambda))
-ggplot(data=BIC_etc, aes(x=trueEdges, y=BIC))+geom_line() + geom_vline(data=BIC_etc[isMax==TRUE,], aes(xintercept=trueEdges))
+ggplot(data=BIC_etc, aes(x=trueEdges, y=BIC))+geom_line() + geom_vline(data=BIC_etc[isMin==TRUE,], aes(xintercept=trueEdges))
 ```
 
 We can plot the Bayesian information criterion as a function of the
@@ -148,8 +235,7 @@ bound on the number of edges that you would want to report.
 
 ## Plot the network
 ```{r, fig.height=8, fig.width=8, results='hide', message=FALSE, warning=FALSE}
-library(igraph)
-edge_bic <- seq(10, BIC_etc[isMax==TRUE,trueEdges], length.out=3)
+edge_bic <- seq(10, BIC_etc[isMin==TRUE,trueEdges], length.out=3)
 graph_seq <- BIC_etc[.(trueEdges=edge_bic),,on='trueEdges', roll=TRUE]
 graphs_to_plot <- lapply(graph_seq[,idx], function(i){
     graph.adjacency(abs(hurdle_fit$adjMat[[i]])>0, mode='max')
@@ -168,3 +254,5 @@ available with `?autoGLM.`
   differential coexpression graphs, but code defining the parameter
   blocks is not yet implemented.  See `?makeModel` and `?Blocks` for
   the functions that would need to be over-ridden and used.
+
+# References
