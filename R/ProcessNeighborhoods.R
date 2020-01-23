@@ -74,6 +74,7 @@ neighborhoodToArray <- function(pathList, nknots, vnames=NULL, summaryFun=summar
     loglikmatrix <- matrix(0, nrow=P, ncol=length(lpath))
     safeApprox <- getSafeApprox(lpath)
     safeApproxPath <- function(x, y) safeApprox(x, y, yright=0)
+    fail = 0
     for(i in seq_along(pathList)){
         if(inherits(pathList[[i]], 'SolPath')){
             gridlist[[i]] <- interpolateSummarizeCoefs(pathList[[i]], safeApproxPath, summaryFun, self_edges)
@@ -81,8 +82,12 @@ neighborhoodToArray <- function(pathList, nknots, vnames=NULL, summaryFun=summar
             ## Take previous loglik on path as lower bound
             ## Needed especially when lambda is disjoint for some coordinates
             loglikmatrix[i,] <- safeApprox(pathList[[i]]$lambda, llnp, method='constant', f=1)$y
+        } else{
+            fail = fail + 1
         }
     }
+    if(fail == length(pathList)) stop("No solution paths found in `pathList`")
+    if(fail > 0) warning(fail, " failures in pathList, these nodes will be excluded from graph.")
     
     allgrid <- rbindlist(gridlist)
     nodeId <- data.table(i=seq_along(vnames), nodeId1=vnames)
