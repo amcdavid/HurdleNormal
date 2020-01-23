@@ -11,7 +11,10 @@ The main functionality is to estimate graphical models using group-lasso penaliz
 \description{
 A Hurdle model is a modification of a distribution at zero. This
     package provides routines to estimate and sample from multivariate Hurdle models
-    on a Normal density. These are distributions that are conditionally Normal, but with singularities along the coordinate axes, so generalize a univariate zero-inflated distribution.  The main functionality is to estimate graphical models using group-lasso penalized neighborhood selection.
+    on a Normal density. These are distributions that are conditionally Normal, 
+    but with singularities along the coordinate axes, so generalize a univariate zero-inflated distribution.  
+    The main functionality is to estimate graphical models using group-lasso penalized neighborhood selection,
+    and has applications to modeling gene-gene interactions in single cell gene expression.
 }
 \references{
 https://arxiv.org/abs/1610.05857

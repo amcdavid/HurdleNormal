@@ -5,8 +5,7 @@
 \alias{cpp_rGibbsHurdle}
 \title{Sample from a multivariate hurdle model}
 \usage{
-rGibbsHurdle(G, H, K, Nt, burnin = 500, thin = 0.1, tol = 5e-04,
-  Nkeep = 500)
+rGibbsHurdle(G, H, K, Nt, burnin = 500, thin = 0.1, tol = 5e-04, Nkeep = 500)
 }
 \arguments{
 \item{G}{symmetric discrete interaction matrix}

@@ -117,6 +117,7 @@ globalVariables(c('penalty.scale.lambda', 'paridx', 'mmidx', 'block'))
 ##' @aliases autoLogistic
 autoGLM <- function(samp, fixed=NULL, parallel=FALSE, keepNodePaths=FALSE, checkpointDir = 'ignored', nlambda=200, lambda.min.ratio=.1, family='binomial'){
     if(is.null(colnames(samp))) colnames(samp) <- seq_len(ncol(samp))
+    colnames(samp) = make_unique(colnames(samp))
     samp0 <- if(family=='binomial') (abs(samp)>0)*1 else samp
     applyfun <- if(parallel) function(X, FUN) parallel::mclapply(X, FUN, mc.preschedule=TRUE) else lapply
     if(is.null(fixed)) fixed <- matrix(1, nrow=nrow(samp0))
@@ -202,6 +203,12 @@ conditionalCenter <- function(samp) {
     })
 }
 
+make_unique = function(x){
+    uniq = make.unique(x)
+    if( length(not_uniq <- which(x != uniq))>0) warning('Element(s) ', paste(x[not_uniq], collapse = ', '), ' have been renamed to be unique.  (Are there unintended duplicates?)')
+    uniq
+}
+
 ##' Fit the hurdle model coordinate-by-coordinate on a sample
 ##'
 ##' @param samp matrix of data, columns are variables
@@ -219,6 +226,7 @@ fitHurdle <- function(samp, fixed=NULL, parallel=TRUE, keepNodePaths=FALSE, chec
     applyfun <- if(parallel) function(X, FUN) parallel::mclapply(X, FUN, mc.preschedule=FALSE) else lapply
     allindices <- seq_len(ncol(samp))
     if(is.null(colnames(samp))) colnames(samp) <- seq_len(ncol(samp))
+    colnames(samp) = make_unique(colnames(samp))
     indices <- if(missing(indices))  allindices else indices
     if(length(setdiff(indices, allindices))>0) stop('`indices` out of range')
     accessDirOrDie(checkpointDir)

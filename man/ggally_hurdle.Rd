@@ -5,8 +5,14 @@
 \alias{ggally_hmosaic}
 \title{Wrapper so ggally can use \code{geom_hurdle}}
 \usage{
-ggally_hurdle(data, mapping, lwd.regression = 1, lwd.axis = 2,
-  size.point = 1, ...)
+ggally_hurdle(
+  data,
+  mapping,
+  lwd.regression = 1,
+  lwd.axis = 2,
+  size.point = 1,
+  ...
+)
 
 ggally_hmosaic(data, mapping, ...)
 }

@@ -6,12 +6,27 @@
 \alias{fitHurdle}
 \title{Fit the hurdle model coordinate-by-coordinate on a sample}
 \usage{
-autoGLM(samp, fixed = NULL, parallel = FALSE, keepNodePaths = FALSE,
-  checkpointDir = "ignored", nlambda = 200, lambda.min.ratio = 0.1,
-  family = "binomial")
+autoGLM(
+  samp,
+  fixed = NULL,
+  parallel = FALSE,
+  keepNodePaths = FALSE,
+  checkpointDir = "ignored",
+  nlambda = 200,
+  lambda.min.ratio = 0.1,
+  family = "binomial"
+)
 
-fitHurdle(samp, fixed = NULL, parallel = TRUE, keepNodePaths = FALSE,
-  checkpointDir = NULL, makeModelArgs = NULL, indices, ...)
+fitHurdle(
+  samp,
+  fixed = NULL,
+  parallel = TRUE,
+  keepNodePaths = FALSE,
+  checkpointDir = NULL,
+  makeModelArgs = NULL,
+  indices,
+  ...
+)
 }
 \arguments{
 \item{samp}{matrix of data, columns are variables}

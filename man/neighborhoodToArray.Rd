@@ -5,8 +5,14 @@
 \alias{print.HurdleNormalFit}
 \title{neighborhoodToArray}
 \usage{
-neighborhoodToArray(pathList, nknots, vnames = NULL,
-  summaryFun = summarySignedL1, nobs, self_edges = FALSE)
+neighborhoodToArray(
+  pathList,
+  nknots,
+  vnames = NULL,
+  summaryFun = summarySignedL1,
+  nobs,
+  self_edges = FALSE
+)
 }
 \arguments{
 \item{pathList}{a list of paths (coefficients in columns, paths in rows)}

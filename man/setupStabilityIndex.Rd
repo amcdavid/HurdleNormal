@@ -4,8 +4,7 @@
 \alias{setupStabilityIndex}
 \title{Set up the subsamples that will be taken for stability selection}
 \usage{
-setupStabilityIndex(obs, strata = rep(1, nrow(obs)), B = 50,
-  seed = 12345)
+setupStabilityIndex(obs, strata = rep(1, nrow(obs)), B = 50, seed = 12345)
 }
 \arguments{
 \item{obs}{a matrix of observations from which rows will be sampled}

@@ -4,8 +4,16 @@
 \alias{stability}
 \title{Refit models for stability selection}
 \usage{
-stability(obs, fixed, stabIndex, step = seq_along(stabIndex), method,
-  stabilityCheckpointDir = NULL, checkpointDir = NULL, ...)
+stability(
+  obs,
+  fixed,
+  stabIndex,
+  step = seq_along(stabIndex),
+  method,
+  stabilityCheckpointDir = NULL,
+  checkpointDir = NULL,
+  ...
+)
 }
 \arguments{
 \item{obs}{a matrix of observations from which rows will be sampled}

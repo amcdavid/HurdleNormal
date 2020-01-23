@@ -4,8 +4,15 @@
 \alias{Block}
 \title{Define parameter groups}
 \usage{
-Block(this.model, blist, mlist, nlist, group = "components", lambda,
-  penalty.scale = NULL)
+Block(
+  this.model,
+  blist,
+  mlist,
+  nlist,
+  group = "components",
+  lambda,
+  penalty.scale = NULL
+)
 }
 \arguments{
 \item{this.model}{(optional) a matrix created by \code{\link{makeModel}}}

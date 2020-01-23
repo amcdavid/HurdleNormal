@@ -4,8 +4,15 @@
 \alias{makeModel}
 \title{Generate a design matrix corresponding to the 2-1-0 hurdle}
 \usage{
-makeModel(zif, nodeId, fixed = NULL, center = TRUE, scale = FALSE,
-  conditionalCenter = TRUE, tol = 0.001)
+makeModel(
+  zif,
+  nodeId,
+  fixed = NULL,
+  center = TRUE,
+  scale = FALSE,
+  conditionalCenter = TRUE,
+  tol = 0.001
+)
 }
 \arguments{
 \item{zif}{zero-inflated covariates}

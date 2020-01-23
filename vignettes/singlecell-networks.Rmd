@@ -179,7 +179,7 @@ logExpression1h = t(shalek2014_list$exprs)
 ##ggpairs doesn't like non-syntactic colnames
 colnames(logExpression1h) <- make.names(colnames(logExpression1h))
 allgenes <- colnames(logExpression1h)
-genes <- c('MGL2', 'MX1', str_subset(allgenes, '^H2[.]'), sample(allgenes, 30))
+genes <- unique(c('MGL2', 'MX1', str_subset(allgenes, '^H2[.]'), sample(allgenes, 30)))
 ggpairs(as.data.frame(logExpression1h[,c('MGL2', 'MX1', 'H2.AA')]),upper=list(continuous=ggally_hurdle), lower=list(continuous=ggally_hmosaic))
 ```
 
