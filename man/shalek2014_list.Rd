@@ -4,7 +4,9 @@
 \name{shalek2014_list}
 \alias{shalek2014_list}
 \title{Single Cell RNAseq Expression Data from Shalek (2014)}
-\format{An object of class \code{list} of length 3.}
+\format{
+An object of class \code{list} of length 3.
+}
 \usage{
 shalek2014_list
 }

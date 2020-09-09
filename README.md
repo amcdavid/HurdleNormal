@@ -6,6 +6,19 @@ This package provides routines to estimate and sample from multivariate Hurdle m
 These are distributions that are conditionally Normal, but with singularities along the coordinate axes, so generalize a univariate zero-inflated distribution.  
 The main functionality is to estimate graphical models using group-lasso penalized neighborhood selection.
 
+## Install
+
+```
+BiocManager::install('amcdavid/HurdleNormal')
+```
+
+or 
+
+```
+BiocManager::install('amcdavid/HurdleNormal', dependencies = TRUE)
+```
+if you want to compile the vignette or run examples [from the paper](inst/aoas_simulations).
+
 ## Vignette
 A vignette with an example is located
 [here](http://htmlpreview.github.io/?https://github.com/amcdavid/HurdleNormal/blob/master/doc/singlecell-networks.html)
