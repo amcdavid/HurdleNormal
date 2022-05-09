@@ -98,7 +98,6 @@ library(dplyr)
 n_vertex = 6
 weight = 1.5
 n_samp = 2e5
-pal = colorRamp(rev(viridis::magma(6)))
 topologies = list(chain = make_ring(n_vertex, directed = FALSE), 
                   hub = make_star(n_vertex, mode = 'undirected'),
                   lattice = make_lattice(c(n_vertex/2, 2), directed = FALSE))

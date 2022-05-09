@@ -6,6 +6,11 @@
 
 using namespace Rcpp;
 
+#ifdef RCPP_USE_GLOBAL_ROSTREAM
+Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
+Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
+#endif
+
 // cpp_rCondHurdle
 double cpp_rCondHurdle(const NumericVector& x, int j, const NumericMatrix& G, const NumericMatrix& H, const NumericMatrix& K, double tol);
 RcppExport SEXP _HurdleNormal_cpp_rCondHurdle(SEXP xSEXP, SEXP jSEXP, SEXP GSEXP, SEXP HSEXP, SEXP KSEXP, SEXP tolSEXP) {

@@ -7,3 +7,5 @@ die.R
 ^\.Rproj\.user$
 inst/vignette2/
 inst/aoas_simulations/
+rank_edges.R
+.Renviron.*

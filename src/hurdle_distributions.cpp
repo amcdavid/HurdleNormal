@@ -26,7 +26,7 @@ double cpp_rCondHurdle(const NumericVector& x, int j, const NumericMatrix& G,  c
     //std::cout << "j=" << j << " i=" << i << ", Gba=" << Gba;
   }
   ASSERT((j-ii+p) % p, 1)
-  double logitP = Gba - .5*log(Kba/(2*PI))+pow(Hba,2)/(2*Kba);
+  double logitP = Gba - .5*log(Kba/(2*M_PI))+pow(Hba,2)/(2*Kba);
   //std::cout << ". logitP=" << logitP << "\n";
   double mu = Hba/Kba;
   DEXEC(Rprintf("x=(%f,%f), j=%d, mu=%f\n", x[0], x[1], j, mu));
